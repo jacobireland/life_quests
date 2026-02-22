@@ -103,10 +103,10 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
   const totalHours = Object.values(stats.totals).reduce((sum, hours) => sum + hours, 0);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+    <div className="card">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="font-semibold text-gray-900">Activity Statistics</h2>
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+        <h2 className="font-semibold text-foreground">Activity Statistics</h2>
+        <div className="flex gap-1 p-1 bg-surface-subtle rounded-card">
           {TIME_FRAMES.map((tf) => (
             <button
               key={tf}
@@ -114,8 +114,8 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
               onClick={() => setTimeFrame(tf)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 timeFrame === tf
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-foreground-secondary hover:bg-neutral-200'
               }`}
             >
               {tf.charAt(0).toUpperCase() + tf.slice(1)}
@@ -125,19 +125,19 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 bg-gray-100 rounded-lg">
-          <div className="flex items-center gap-2 text-blue-600 mb-1">
+        <div className="p-4 bg-surface-subtle rounded-card">
+          <div className="flex items-center gap-2 text-primary mb-1">
             <Calendar className="w-4 h-4" />
             <span className="text-sm font-medium">Total Hours</span>
           </div>
-          <div className="font-semibold text-2xl text-gray-900">{totalHours.toFixed(1)}</div>
+          <div className="font-semibold text-2xl text-foreground">{totalHours.toFixed(1)}</div>
         </div>
-        <div className="p-4 bg-green-50 rounded-lg">
-          <div className="flex items-center gap-2 text-green-600 mb-1">
+        <div className="p-4 bg-success-bg rounded-card">
+          <div className="flex items-center gap-2 text-success-text mb-1">
             <TrendingUp className="w-4 h-4" />
             <span className="text-sm font-medium">Activities</span>
           </div>
-          <div className="font-semibold text-2xl text-gray-900">
+          <div className="font-semibold text-2xl text-foreground">
             {Object.keys(stats.totals).length}
           </div>
         </div>
@@ -156,9 +156,9 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
+                  backgroundColor: 'var(--color-surface-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-card)',
                 }}
               />
               <Legend />
@@ -174,7 +174,7 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-foreground-subtle">
           <p className="font-medium">No data for this time period</p>
           <p className="text-sm mt-1">Start logging activities to see statistics</p>
         </div>
@@ -182,7 +182,7 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
 
       {Object.keys(stats.totals).length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Breakdown by Activity</h3>
+          <h3 className="text-sm font-medium text-foreground mb-3">Breakdown by Activity</h3>
           {Object.entries(stats.totals)
             .sort(([, a], [, b]) => b - a)
             .map(([name, hours]) => {
@@ -196,10 +196,10 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-900">{name}</span>
-                      <span className="font-medium text-gray-700">{hours.toFixed(1)}h</span>
+                      <span className="text-foreground">{name}</span>
+                      <span className="font-medium text-foreground-secondary">{hours.toFixed(1)}h</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-neutral-200 rounded-full h-2">
                       <div
                         className="h-2 rounded-full transition-all"
                         style={{

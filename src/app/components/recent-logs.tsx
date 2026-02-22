@@ -34,11 +34,11 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-      <h2 className="font-semibold text-gray-900 mb-4">Recent Logs</h2>
+    <div className="card">
+      <h2 className="font-semibold text-foreground mb-4">Recent Logs</h2>
 
       {sortedLogs.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-foreground-subtle">
           <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p className="font-medium">No activity logs yet</p>
           <p className="text-sm mt-1">Start by logging your first activity</p>
@@ -52,7 +52,7 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
             return (
               <div
                 key={log.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-gray-50/50 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-3 rounded-card border border-border bg-surface-muted hover:bg-surface-subtle transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
@@ -60,8 +60,8 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                     style={{ backgroundColor: activity.color }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900">{activity.name}</div>
-                    <div className="text-sm text-gray-600">
+                    <div className="font-medium text-foreground">{activity.name}</div>
+                    <div className="text-sm text-foreground-muted">
                       {formatDate(log.date)} • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
                     </div>
                   </div>
@@ -69,7 +69,7 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 <button
                   type="button"
                   onClick={() => onDeleteLog(log.id)}
-                  className="text-red-500 hover:text-red-700 transition-colors p-2 rounded flex-shrink-0"
+                  className="text-destructive hover:text-destructive-hover transition-colors p-2 rounded flex-shrink-0"
                   aria-label="Delete log"
                 >
                   <Trash2 className="w-4 h-4" />
