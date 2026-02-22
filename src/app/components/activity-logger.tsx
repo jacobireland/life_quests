@@ -2,6 +2,9 @@ import React, { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import type { Activity } from '../types';
 
+const INPUT_CLASS =
+  'w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+
 interface ActivityLoggerProps {
   activities: Activity[];
   onLogActivity: (activityId: string, hours: number, date: string) => void;
@@ -32,7 +35,7 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
             id="activity"
             value={selectedActivity}
             onChange={(e) => setSelectedActivity(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={INPUT_CLASS}
             required
           >
             <option value="">Select an activity</option>
@@ -56,7 +59,7 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
             max="24"
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={`${INPUT_CLASS} placeholder-gray-500`}
             placeholder="e.g., 2.5"
             required
           />
@@ -71,7 +74,7 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={INPUT_CLASS}
             required
           />
         </div>

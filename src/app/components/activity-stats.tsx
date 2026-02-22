@@ -54,9 +54,6 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
         startDate = new Date(now.getFullYear(), 0, 1);
         format = (d) => d.toLocaleDateString('en-US', { month: 'short' });
         break;
-      default:
-        startDate = startOfToday;
-        format = (d) => d.toISOString();
     }
 
     const filteredLogs = logs.filter((log) => {

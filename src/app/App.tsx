@@ -33,12 +33,10 @@ export default function App() {
   }, [logs]);
 
   const handleAddActivity = (name: string, color: string) => {
-    const newActivity: Activity = {
-      id: Date.now().toString(),
-      name,
-      color,
-    };
-    setActivities([...activities, newActivity]);
+    setActivities([
+      ...activities,
+      { id: Date.now().toString(), name, color },
+    ]);
   };
 
   const handleRemoveActivity = (id: string) => {
@@ -46,13 +44,10 @@ export default function App() {
   };
 
   const handleLogActivity = (activityId: string, hours: number, date: string) => {
-    const newLog: ActivityLog = {
-      id: Date.now().toString(),
-      activityId,
-      hours,
-      date,
-    };
-    setLogs([...logs, newLog]);
+    setLogs([
+      ...logs,
+      { id: Date.now().toString(), activityId, hours, date },
+    ]);
   };
 
   const handleDeleteLog = (id: string) => {
@@ -60,7 +55,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
