@@ -7,40 +7,41 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: 'var(--color-primary)',
-          hover: 'var(--color-primary-hover)',
-          ring: 'var(--color-primary-ring)',
+        /* Background */
+        background: 'var(--color-background)',
+        'background-text': 'var(--color-background-text)',
+        /* Foreground (cards, panels); all text variants = foreground-text */
+        foreground: {
+          DEFAULT: 'var(--color-foreground-text)',
+          surface: 'var(--color-foreground)',
+          text: 'var(--color-foreground-text)',
+          'text-hover': 'var(--color-foreground-text-hover)',
+          secondary: 'var(--color-foreground-text)',
+          muted: 'var(--color-foreground-text)',
+          subtle: 'var(--color-foreground-text)',
         },
+        /* Accent */
+        primary: 'var(--color-primary)',
+        secondary: 'var(--color-secondary)',
+        tertiary: 'var(--color-tertiary)',
+        /* Miscellaneous */
         destructive: {
           DEFAULT: 'var(--color-destructive)',
           hover: 'var(--color-destructive-hover)',
         },
+        /* Aliases so existing classes still work */
         surface: {
-          page: 'var(--color-surface-page)',
-          card: 'var(--color-surface-card)',
-          muted: 'var(--color-surface-muted)',
-          subtle: 'var(--color-surface-subtle)',
+          page: 'var(--color-background)',
+          card: 'var(--color-foreground)',
+          muted: 'var(--color-foreground)',
+          subtle: 'var(--color-tertiary)',
         },
-        border: {
-          DEFAULT: 'var(--color-border)',
-          input: 'var(--color-border-input)',
-        },
-        foreground: {
-          DEFAULT: 'var(--color-foreground)',
-          secondary: 'var(--color-foreground-secondary)',
-          muted: 'var(--color-foreground-muted)',
-          subtle: 'var(--color-foreground-subtle)',
-        },
-        success: {
-          bg: 'var(--color-success-bg)',
-          text: 'var(--color-success-text)',
-        },
+        border: 'var(--color-tertiary)',
         neutral: {
-          200: 'var(--color-neutral-200)',
-          300: 'var(--color-neutral-300)',
-          400: 'var(--color-neutral-400)',
-          800: 'var(--color-neutral-800)',
+          200: 'var(--color-tertiary)',
+          300: 'var(--color-tertiary)',
+          400: 'var(--color-tertiary)',
+          800: 'var(--color-foreground-text)',
         },
       },
       borderRadius: {

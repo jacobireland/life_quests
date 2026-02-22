@@ -1,217 +1,231 @@
 import React, { useMemo, useState } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { Calendar, TrendingUp } from 'lucide-react';
-import type { Activity, ActivityLog } from '../types';
+import type { Activity, ActivityLog, QuestGoal } from '../types';
+import { parseLocalDate } from '../utils/date';
 
-const TIME_FRAMES = ['day', 'week', 'month', 'year'] as const;
-type TimeFrame = (typeof TIME_FRAMES)[number];
+const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
+type TimeRangeTab = (typeof TIME_RANGES)[number];
+
+const TAB_LABELS: Record<TimeRangeTab, string> = {
+  day: 'Daily',
+  week: 'Weekly',
+  month: 'Monthly',
+  year: 'Yearly',
+};
 
 interface ActivityStatsProps {
   activities: Activity[];
   logs: ActivityLog[];
 }
 
-interface ChartDataPoint {
-  date: string;
-  fullDate: string;
-  [activityName: string]: string | number;
+function startOfWeek(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setDate(date.getDate() - day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfWeek(d: Date): Date {
+  const date = startOfWeek(d);
+  date.setDate(date.getDate() + 6);
+  date.setHours(23, 59, 59, 999);
+  return date;
+}
+
+function getCurrentPeriodBounds(timeRange: TimeRangeTab): { start: Date; end: Date } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+
+  switch (timeRange) {
+    case 'day':
+      return {
+        start: new Date(y, m, d, 0, 0, 0, 0),
+        end: new Date(y, m, d, 23, 59, 59, 999),
+      };
+    case 'week':
+      return {
+        start: startOfWeek(now),
+        end: endOfWeek(now),
+      };
+    case 'month':
+      return {
+        start: new Date(y, m, 1, 0, 0, 0, 0),
+        end: new Date(y, m + 1, 0, 23, 59, 59, 999),
+      };
+    case 'year':
+      return {
+        start: new Date(y, 0, 1, 0, 0, 0, 0),
+        end: new Date(y, 11, 31, 23, 59, 59, 999),
+      };
+    default:
+      return {
+        start: new Date(y, m, d, 0, 0, 0, 0),
+        end: new Date(y, m, d, 23, 59, 59, 999),
+      };
+  }
+}
+
+function formatGoalLabel(goal: QuestGoal): string {
+  const unitLabel = goal.unit === 'hours' ? (goal.amount === 1 ? 'hour' : 'hours') : (goal.amount === 1 ? 'session' : 'sessions');
+  const rangeLabel = goal.timeRange === 'day' ? 'day' : goal.timeRange === 'week' ? 'week' : goal.timeRange === 'month' ? 'month' : 'year';
+  return `${goal.amount} ${unitLabel} / ${rangeLabel}`;
 }
 
 export function ActivityStats({ activities, logs }: ActivityStatsProps) {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
+  const [activeTab, setActiveTab] = useState<TimeRangeTab>('week');
 
-  const stats = useMemo(() => {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { completed, current } = useMemo(() => {
+    const bounds = getCurrentPeriodBounds(activeTab);
+    const start = bounds.start.getTime();
+    const end = bounds.end.getTime();
 
-    let startDate: Date;
-    let format: (d: Date) => string;
+    const questsInTab = activities.filter((a) => {
+      const goal = a.goals[0];
+      return goal && goal.timeRange === activeTab;
+    });
 
-    switch (timeFrame) {
-      case 'day':
-        startDate = startOfToday;
-        format = (d) => `${d.getHours()}:00`;
-        break;
-      case 'week':
-        startDate = new Date(startOfToday);
-        startDate.setDate(startDate.getDate() - 6);
-        format = (d) => d.toLocaleDateString('en-US', { weekday: 'short' });
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        format = (d) => `${d.getDate()}`;
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        format = (d) => d.toLocaleDateString('en-US', { month: 'short' });
-        break;
+    const completed: Activity[] = [];
+    const current: Activity[] = [];
+
+    for (const activity of questsInTab) {
+      const goal = activity.goals[0]!;
+      const periodLogs = logs.filter((log) => {
+        const logStart = parseLocalDate(log.date).getTime();
+        const logEnd = logStart + 86400000 - 1;
+        return logStart <= end && logEnd >= start && log.activityId === activity.id;
+      });
+
+      const logged =
+        goal.unit === 'hours'
+          ? periodLogs.reduce((sum, log) => sum + log.hours, 0)
+          : periodLogs.length;
+      const target = goal.amount;
+      const isCompleted = logged >= target;
+
+      if (isCompleted) completed.push(activity);
+      else current.push(activity);
     }
 
-    const filteredLogs = logs.filter((log) => {
-      const logDate = new Date(log.date);
-      return logDate >= startDate && logDate <= now;
+    return { completed, current };
+  }, [activities, logs, activeTab]);
+
+  const getProgress = (activity: Activity): { logged: number; target: number; unit: string; percent: number } => {
+    const goal = activity.goals[0]!;
+    const bounds = getCurrentPeriodBounds(activeTab);
+    const start = bounds.start.getTime();
+    const end = bounds.end.getTime();
+    const periodLogs = logs.filter((log) => {
+      const logStart = parseLocalDate(log.date).getTime();
+      const logEnd = logStart + 86400000 - 1;
+      return logStart <= end && logEnd >= start && log.activityId === activity.id;
     });
-
-    const groupedByDate: Record<string, Record<string, number>> = {};
-
-    filteredLogs.forEach((log) => {
-      const dateKey = log.date;
-      if (!groupedByDate[dateKey]) {
-        groupedByDate[dateKey] = {};
-      }
-      if (!groupedByDate[dateKey][log.activityId]) {
-        groupedByDate[dateKey][log.activityId] = 0;
-      }
-      groupedByDate[dateKey][log.activityId] += log.hours;
-    });
-
-    const chartData: ChartDataPoint[] = Object.entries(groupedByDate).map(
-      ([date, activityHours]) => {
-        const dataPoint: ChartDataPoint = {
-          date: format(new Date(date)),
-          fullDate: date,
-        };
-        Object.entries(activityHours).forEach(([activityId, hours]) => {
-          const activity = activities.find((a) => a.id === activityId);
-          if (activity) {
-            dataPoint[activity.name] = hours;
-          }
-        });
-        return dataPoint;
-      },
-    );
-
-    const totals: Record<string, number> = {};
-    activities.forEach((activity) => {
-      totals[activity.name] = filteredLogs
-        .filter((log) => log.activityId === activity.id)
-        .reduce((sum, log) => sum + log.hours, 0);
-    });
-
-    return { chartData, totals };
-  }, [activities, logs, timeFrame]);
-
-  const totalHours = Object.values(stats.totals).reduce((sum, hours) => sum + hours, 0);
+    const logged =
+      goal.unit === 'hours'
+        ? periodLogs.reduce((sum, log) => sum + log.hours, 0)
+        : periodLogs.length;
+    const target = goal.amount;
+    const percent = target > 0 ? Math.min(100, (logged / target) * 100) : 0;
+    const unit = goal.unit === 'hours' ? 'hrs' : 'sessions';
+    return { logged, target, unit, percent };
+  };
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="font-semibold text-foreground">Activity Statistics</h2>
-        <div className="flex gap-1 p-1 bg-surface-subtle rounded-card">
-          {TIME_FRAMES.map((tf) => (
-            <button
-              key={tf}
-              type="button"
-              onClick={() => setTimeFrame(tf)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                timeFrame === tf
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-foreground-secondary hover:bg-neutral-200'
-              }`}
-            >
-              {tf.charAt(0).toUpperCase() + tf.slice(1)}
-            </button>
-          ))}
-        </div>
+      <h2 className="font-semibold text-foreground-text mb-4">Ongoing Quests</h2>
+
+      <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
+        {TIME_RANGES.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'bg-primary text-secondary shadow-sm'
+                : 'text-foreground-secondary hover:bg-neutral-200'
+            }`}
+          >
+            {TAB_LABELS[tab]}
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 bg-surface-subtle rounded-card">
-          <div className="flex items-center gap-2 text-primary mb-1">
-            <Calendar className="w-4 h-4" />
-            <span className="text-sm font-medium">Total Hours</span>
-          </div>
-          <div className="font-semibold text-2xl text-foreground">{totalHours.toFixed(1)}</div>
-        </div>
-        <div className="p-4 bg-success-bg rounded-card">
-          <div className="flex items-center gap-2 text-success-text mb-1">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-sm font-medium">Activities</span>
-          </div>
-          <div className="font-semibold text-2xl text-foreground">
-            {Object.keys(stats.totals).length}
-          </div>
-        </div>
-      </div>
-
-      {stats.chartData.length > 0 ? (
-        <div className="mb-6">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stats.chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
-              <YAxis
-                label={{ value: 'Hours', angle: -90, position: 'insideLeft' }}
-                stroke="#6b7280"
-                fontSize={12}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'var(--color-surface-card)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-card)',
-                }}
-              />
-              <Legend />
-              {activities.map((activity) => (
-                <Bar
-                  key={activity.id}
-                  dataKey={activity.name}
-                  fill={activity.color}
-                  stackId="a"
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {completed.length === 0 && current.length === 0 ? (
+        <p className="text-foreground-subtle text-sm">
+          No quests with a {TAB_LABELS[activeTab].toLowerCase()} goal. Add a quest and set its goal to this period to see it here.
+        </p>
       ) : (
-        <div className="text-center py-12 text-foreground-subtle">
-          <p className="font-medium">No data for this time period</p>
-          <p className="text-sm mt-1">Start logging activities to see statistics</p>
-        </div>
-      )}
-
-      {Object.keys(stats.totals).length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-foreground mb-3">Breakdown by Activity</h3>
-          {Object.entries(stats.totals)
-            .sort(([, a], [, b]) => b - a)
-            .map(([name, hours]) => {
-              const activity = activities.find((a) => a.name === name);
-              const percentage = totalHours > 0 ? (hours / totalHours) * 100 : 0;
-              return (
-                <div key={name} className="flex items-center gap-3">
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: activity?.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-foreground">{name}</span>
-                      <span className="font-medium text-foreground-secondary">{hours.toFixed(1)}h</span>
-                    </div>
-                    <div className="w-full bg-neutral-200 rounded-full h-2">
+        <div className="space-y-6">
+          {completed.length > 0 && (
+            <section>
+              <h3 className="text-sm font-medium text-foreground-text mb-2">Completed Quests</h3>
+              <ul className="space-y-2">
+                {completed.map((activity) => {
+                  const goal = activity.goals[0]!;
+                  const progress = getProgress(activity);
+                  return (
+                    <li
+                      key={activity.id}
+                      className="flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted"
+                    >
                       <div
-                        className="h-2 rounded-full transition-all"
-                        style={{
-                          width: `${percentage}%`,
-                          backgroundColor: activity?.color,
-                        }}
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: activity.color }}
                       />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-foreground-text">{activity.name}</span>
+                        <span className="text-foreground-muted text-sm ml-2">
+                          {formatGoalLabel(goal)} • {progress.logged} {progress.unit} logged
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {current.length > 0 && (
+            <section>
+              <h3 className="text-sm font-medium text-foreground-text mb-2">Current Quests</h3>
+              <ul className="space-y-3">
+                {current.map((activity) => {
+                  const goal = activity.goals[0]!;
+                  const progress = getProgress(activity);
+                  return (
+                    <li
+                      key={activity.id}
+                      className="flex flex-col gap-1.5 p-3 rounded-card border border-border bg-surface-muted"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: activity.color }}
+                        />
+                        <div className="flex-1 min-w-0 flex justify-between items-baseline gap-2">
+                          <span className="font-medium text-foreground-text">{activity.name}</span>
+                          <span className="text-foreground-secondary text-sm whitespace-nowrap">
+                            {progress.logged} / {progress.target} {progress.unit}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-neutral-200 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${progress.percent}%`,
+                            backgroundColor: activity.color,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
         </div>
       )}
     </div>

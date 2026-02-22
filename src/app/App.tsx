@@ -1,58 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ActivityLogger } from './components/activity-logger';
 import { ActivityManager } from './components/activity-manager';
 import { ActivityStats } from './components/activity-stats';
 import { RecentLogs } from './components/recent-logs';
-import type { Activity, ActivityLog } from './types';
+import { SupabaseInstruments } from './components/supabase-instruments';
+import { useQuestData } from './hooks/useQuestData';
 import { BarChart3 } from 'lucide-react';
 
-const DEFAULT_ACTIVITIES: Activity[] = [
-  { id: '1', name: 'Exercise', color: '#10b981' },
-  { id: '2', name: 'Reading', color: '#3b82f6' },
-  { id: '3', name: 'Work', color: '#8b5cf6' },
-  { id: '4', name: 'Study', color: '#f59e0b' },
-];
-
 export default function App() {
-  const [activities, setActivities] = useState<Activity[]>(() => {
-    const saved = localStorage.getItem('activities');
-    return saved ? JSON.parse(saved) : DEFAULT_ACTIVITIES;
-  });
-
-  const [logs, setLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem('activityLogs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('activities', JSON.stringify(activities));
-  }, [activities]);
-
-  useEffect(() => {
-    localStorage.setItem('activityLogs', JSON.stringify(logs));
-  }, [logs]);
-
-  const handleAddActivity = (name: string, color: string) => {
-    setActivities([
-      ...activities,
-      { id: Date.now().toString(), name, color },
-    ]);
-  };
-
-  const handleRemoveActivity = (id: string) => {
-    setActivities(activities.filter((a) => a.id !== id));
-  };
-
-  const handleLogActivity = (activityId: string, hours: number, date: string) => {
-    setLogs([
-      ...logs,
-      { id: Date.now().toString(), activityId, hours, date },
-    ]);
-  };
-
-  const handleDeleteLog = (id: string) => {
-    setLogs(logs.filter((log) => log.id !== id));
-  };
+  const { quests, logs, addQuest, updateQuest, removeQuest, addLog, deleteLog } = useQuestData();
 
   return (
     <div className="min-h-screen">
@@ -60,33 +16,35 @@ export default function App() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <BarChart3 className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">Activity Tracker</h1>
+            <h1 className="text-3xl font-bold text-secondary">Quest Tracker</h1>
           </div>
-          <p className="text-foreground-muted">
-            Track your daily activities and monitor your progress over time
+          <p className="text-background-text-muted">
+            Track your daily quests and monitor your progress over time
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
             <ActivityManager
-              activities={activities}
-              onAddActivity={handleAddActivity}
-              onRemoveActivity={handleRemoveActivity}
+              activities={quests}
+              onAddQuest={addQuest}
+              onUpdateQuest={updateQuest}
+              onRemoveActivity={removeQuest}
             />
             <ActivityLogger
-              activities={activities}
-              onLogActivity={handleLogActivity}
+              activities={quests}
+              onLogActivity={addLog}
             />
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <ActivityStats activities={activities} logs={logs} />
+            <ActivityStats activities={quests} logs={logs} />
             <RecentLogs
-              activities={activities}
+              activities={quests}
               logs={logs}
-              onDeleteLog={handleDeleteLog}
+              onDeleteLog={deleteLog}
             />
+            <SupabaseInstruments />
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import type { Activity } from '../types';
+import { getTodayLocal } from '../utils/date';
 
 interface ActivityLoggerProps {
   activities: Activity[];
@@ -10,7 +11,11 @@ interface ActivityLoggerProps {
 export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProps) {
   const [selectedActivity, setSelectedActivity] = useState('');
   const [hours, setHours] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => getTodayLocal());
+
+  const selectedQuest = activities.find((a) => a.id === selectedActivity);
+  const isSessionQuest = selectedQuest?.goals[0]?.unit === 'sessions';
+  const submitLabel = isSessionQuest ? 'Log session' : 'Log hours';
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -22,20 +27,20 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
 
   return (
     <div className="card">
-      <h2 className="font-semibold text-foreground mb-4">Log Activity</h2>
+      <h2 className="font-semibold text-foreground-text mb-4">Log Quest</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="activity" className="block text-sm font-medium text-foreground-secondary mb-2">
-            Activity
+          <label htmlFor="quest" className="block text-sm font-medium text-foreground-secondary mb-2">
+            Quest
           </label>
           <select
-            id="activity"
+            id="quest"
             value={selectedActivity}
             onChange={(e) => setSelectedActivity(e.target.value)}
             className="input-base"
             required
           >
-            <option value="">Select an activity</option>
+            <option value="">Select a quest</option>
             {activities.map((activity) => (
               <option key={activity.id} value={activity.id}>
                 {activity.name}
@@ -81,7 +86,7 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
           className="w-full btn-primary rounded-card px-4 py-3 flex items-center justify-center gap-2 font-medium"
         >
           <Plus className="w-4 h-4" />
-          Log Activity
+          {submitLabel}
         </button>
       </form>
     </div>
