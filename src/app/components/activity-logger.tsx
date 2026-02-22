@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import React, { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
+import type { Activity } from '../types';
 
-export function ActivityLogger({ activities, onLogActivity }) {
+interface ActivityLoggerProps {
+  activities: Activity[];
+  onLogActivity: (activityId: string, hours: number, date: string) => void;
+}
+
+export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProps) {
   const [selectedActivity, setSelectedActivity] = useState('');
   const [hours, setHours] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (selectedActivity && hours && date) {
       onLogActivity(selectedActivity, parseFloat(hours), date);

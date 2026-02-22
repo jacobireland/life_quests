@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityLogger } from './components/activity-logger';
 import { ActivityManager } from './components/activity-manager';
 import { ActivityStats } from './components/activity-stats';
 import { RecentLogs } from './components/recent-logs';
+import type { Activity, ActivityLog } from './types';
 import { BarChart3 } from 'lucide-react';
 
-const DEFAULT_ACTIVITIES = [
+const DEFAULT_ACTIVITIES: Activity[] = [
   { id: '1', name: 'Exercise', color: '#10b981' },
   { id: '2', name: 'Reading', color: '#3b82f6' },
   { id: '3', name: 'Work', color: '#8b5cf6' },
@@ -13,12 +14,12 @@ const DEFAULT_ACTIVITIES = [
 ];
 
 export default function App() {
-  const [activities, setActivities] = useState(() => {
+  const [activities, setActivities] = useState<Activity[]>(() => {
     const saved = localStorage.getItem('activities');
     return saved ? JSON.parse(saved) : DEFAULT_ACTIVITIES;
   });
 
-  const [logs, setLogs] = useState(() => {
+  const [logs, setLogs] = useState<ActivityLog[]>(() => {
     const saved = localStorage.getItem('activityLogs');
     return saved ? JSON.parse(saved) : [];
   });
@@ -31,8 +32,8 @@ export default function App() {
     localStorage.setItem('activityLogs', JSON.stringify(logs));
   }, [logs]);
 
-  const handleAddActivity = (name, color) => {
-    const newActivity = {
+  const handleAddActivity = (name: string, color: string) => {
+    const newActivity: Activity = {
       id: Date.now().toString(),
       name,
       color,
@@ -40,12 +41,12 @@ export default function App() {
     setActivities([...activities, newActivity]);
   };
 
-  const handleRemoveActivity = (id) => {
+  const handleRemoveActivity = (id: string) => {
     setActivities(activities.filter((a) => a.id !== id));
   };
 
-  const handleLogActivity = (activityId, hours, date) => {
-    const newLog = {
+  const handleLogActivity = (activityId: string, hours: number, date: string) => {
+    const newLog: ActivityLog = {
       id: Date.now().toString(),
       activityId,
       hours,
@@ -54,14 +55,13 @@ export default function App() {
     setLogs([...logs, newLog]);
   };
 
-  const handleDeleteLog = (id) => {
+  const handleDeleteLog = (id: string) => {
     setLogs(logs.filter((log) => log.id !== id));
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <BarChart3 className="w-8 h-8 text-blue-600" />
@@ -72,9 +72,7 @@ export default function App() {
           </p>
         </div>
 
-        {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
           <div className="space-y-6">
             <ActivityManager
               activities={activities}
@@ -87,7 +85,6 @@ export default function App() {
             />
           </div>
 
-          {/* Right Column - Stats and Logs */}
           <div className="lg:col-span-2 space-y-6">
             <ActivityStats activities={activities} logs={logs} />
             <RecentLogs

@@ -1,23 +1,34 @@
-import { useState } from 'react';
+import React, { useState, type FormEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import type { Activity } from '../types';
 
 const PRESET_COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#14b8a6', // teal
-  '#f97316', // orange
+  '#3b82f6',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
 ];
 
-export function ActivityManager({ activities, onAddActivity, onRemoveActivity }) {
+interface ActivityManagerProps {
+  activities: Activity[];
+  onAddActivity: (name: string, color: string) => void;
+  onRemoveActivity: (id: string) => void;
+}
+
+export function ActivityManager({
+  activities,
+  onAddActivity,
+  onRemoveActivity,
+}: ActivityManagerProps) {
   const [newActivityName, setNewActivityName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
   const [isAdding, setIsAdding] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (newActivityName.trim()) {
       onAddActivity(newActivityName.trim(), selectedColor);

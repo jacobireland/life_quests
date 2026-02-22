@@ -1,13 +1,21 @@
+import React from 'react';
 import { Trash2, Clock } from 'lucide-react';
+import type { Activity, ActivityLog } from '../types';
 
-export function RecentLogs({ activities, logs, onDeleteLog }) {
+interface RecentLogsProps {
+  activities: Activity[];
+  logs: ActivityLog[];
+  onDeleteLog: (id: string) => void;
+}
+
+export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
   const sortedLogs = [...logs].sort((a, b) => {
     const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
     if (dateCompare !== 0) return dateCompare;
     return b.id.localeCompare(a.id);
   });
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date(today);

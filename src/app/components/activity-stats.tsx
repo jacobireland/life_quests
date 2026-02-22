@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,18 +10,31 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Calendar, TrendingUp } from 'lucide-react';
+import type { Activity, ActivityLog } from '../types';
 
-const TIME_FRAMES = ['day', 'week', 'month', 'year'];
+const TIME_FRAMES = ['day', 'week', 'month', 'year'] as const;
+type TimeFrame = (typeof TIME_FRAMES)[number];
 
-export function ActivityStats({ activities, logs }) {
-  const [timeFrame, setTimeFrame] = useState('day');
+interface ActivityStatsProps {
+  activities: Activity[];
+  logs: ActivityLog[];
+}
+
+interface ChartDataPoint {
+  date: string;
+  fullDate: string;
+  [activityName: string]: string | number;
+}
+
+export function ActivityStats({ activities, logs }: ActivityStatsProps) {
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
 
   const stats = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    let startDate;
-    let format;
+    let startDate: Date;
+    let format: (d: Date) => string;
 
     switch (timeFrame) {
       case 'day':
@@ -51,7 +64,7 @@ export function ActivityStats({ activities, logs }) {
       return logDate >= startDate && logDate <= now;
     });
 
-    const groupedByDate = {};
+    const groupedByDate: Record<string, Record<string, number>> = {};
 
     filteredLogs.forEach((log) => {
       const dateKey = log.date;
@@ -64,18 +77,23 @@ export function ActivityStats({ activities, logs }) {
       groupedByDate[dateKey][log.activityId] += log.hours;
     });
 
-    const chartData = Object.entries(groupedByDate).map(([date, activityHours]) => {
-      const dataPoint = { date: format(new Date(date)), fullDate: date };
-      Object.entries(activityHours).forEach(([activityId, hours]) => {
-        const activity = activities.find((a) => a.id === activityId);
-        if (activity) {
-          dataPoint[activity.name] = hours;
-        }
-      });
-      return dataPoint;
-    });
+    const chartData: ChartDataPoint[] = Object.entries(groupedByDate).map(
+      ([date, activityHours]) => {
+        const dataPoint: ChartDataPoint = {
+          date: format(new Date(date)),
+          fullDate: date,
+        };
+        Object.entries(activityHours).forEach(([activityId, hours]) => {
+          const activity = activities.find((a) => a.id === activityId);
+          if (activity) {
+            dataPoint[activity.name] = hours;
+          }
+        });
+        return dataPoint;
+      },
+    );
 
-    const totals = {};
+    const totals: Record<string, number> = {};
     activities.forEach((activity) => {
       totals[activity.name] = filteredLogs
         .filter((log) => log.activityId === activity.id)
