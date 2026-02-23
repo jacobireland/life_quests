@@ -9,12 +9,13 @@ interface ActivityLoggerProps {
 }
 
 export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProps) {
+  const campaigns = activities.filter((a) => (a.kind ?? 'campaign') === 'campaign');
   const [selectedActivity, setSelectedActivity] = useState('');
   const [hours, setHours] = useState('');
   const [date, setDate] = useState(() => getTodayLocal());
   const [title, setTitle] = useState('');
 
-  const selectedQuest = activities.find((a) => a.id === selectedActivity);
+  const selectedQuest = campaigns.find((a) => a.id === selectedActivity);
   const isSessionQuest = selectedQuest?.goals[0]?.unit === 'sessions';
   const submitLabel = isSessionQuest ? 'Log Mission Report' : 'Log Mission Report';
 
@@ -47,7 +48,7 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
             required
           >
             <option value="">Select a campaign</option>
-            {activities.map((activity) => (
+            {campaigns.map((activity) => (
               <option key={activity.id} value={activity.id}>
                 {activity.name}
               </option>

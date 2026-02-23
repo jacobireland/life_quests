@@ -1,4 +1,4 @@
-import type { Activity, ActivityKind, QuestGoal } from '../types';
+import type { Activity, ActivityCategory, ActivityKind, QuestGoal } from '../types';
 import { getTodayLocal } from '../utils/date';
 
 /**
@@ -30,6 +30,17 @@ export function normalizeQuest(raw: Record<string, unknown>): Activity {
       : typeof raw.endDate === 'string'
         ? raw.endDate
         : null;
+  const notes =
+    raw.notes === null || raw.notes === undefined
+      ? null
+      : typeof raw.notes === 'string'
+        ? raw.notes
+        : null;
+  const rawCategory = raw.category === 'alchemist' ? 'craftsman' : raw.category;
+  const category: ActivityCategory =
+    rawCategory === 'warrior' || rawCategory === 'scholar' || rawCategory === 'adventurer' || rawCategory === 'craftsman'
+      ? rawCategory
+      : 'warrior';
 
-  return { id, name, color, goals, startDate, endDate, kind };
+  return { id, name, color, goals, startDate, endDate, kind, notes, category };
 }

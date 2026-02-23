@@ -60,6 +60,8 @@ export function useQuestData() {
         startDate: data.startDate ?? getTodayLocal(),
         endDate: data.endDate ?? null,
         kind: data.kind ?? 'campaign',
+        notes: data.notes ?? null,
+        category: data.category ?? 'warrior',
       },
     ]);
   }, []);

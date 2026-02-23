@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
 import { parseLocalDate } from '../utils/date';
+import { CategoryIcon } from './category-icon';
 
 const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
 type TimeRangeTab = (typeof TIME_RANGES)[number];
@@ -160,26 +161,62 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
         ))}
       </div>
 
-      <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
-        {TIME_RANGES.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? 'bg-primary text-secondary shadow-sm'
-                : 'text-foreground-secondary hover:bg-neutral-200'
-            }`}
-          >
-            {TAB_LABELS[tab]}
-          </button>
-        ))}
-      </div>
+      <h2 className="font-semibold text-foreground-text mt-4 mb-4">
+        {kindTab === 'campaignObjectives' ? 'Campaign Objectives' : 'Side Quests'}
+      </h2>
 
-      {completed.length === 0 && current.length === 0 ? (
+      {kindTab === 'campaignObjectives' && (
+        <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
+          {TIME_RANGES.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? 'bg-primary text-secondary shadow-sm'
+                  : 'text-foreground-secondary hover:bg-neutral-200'
+              }`}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {kindTab === 'sideQuests' ? (
+        displayActivities.length === 0 ? (
+          <p className="text-foreground-subtle text-sm">
+            No side quests yet. Add one in the Activity Manager.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {displayActivities.map((activity) => (
+              <li
+                key={activity.id}
+                className="flex items-start gap-3 p-3 rounded-card border border-border bg-surface-muted"
+              >
+                <CategoryIcon
+                  category={activity.category ?? 'warrior'}
+                  color={activity.color}
+                  size={20}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-foreground-text">{activity.name}</span>
+                  {activity.notes && (
+                    <p className="text-foreground-muted text-sm mt-1.5 whitespace-pre-wrap">
+                      {activity.notes}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : completed.length === 0 && current.length === 0 ? (
         <p className="text-foreground-subtle text-sm">
-          No {kindTab === 'campaignObjectives' ? 'campaigns' : 'side quests'} with a {TAB_LABELS[activeTab].toLowerCase()} goal. Add one and set its goal to this period to see it here.
+          No campaigns with a {TAB_LABELS[activeTab].toLowerCase()} goal. Add one and set its goal to this period to see it here.
         </p>
       ) : (
         <div className="space-y-6">
@@ -195,9 +232,10 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                       className="flex flex-col gap-1.5 p-3 rounded-card border border-border bg-surface-muted"
                     >
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: activity.color }}
+                        <CategoryIcon
+                          category={activity.category ?? 'warrior'}
+                          color={activity.color}
+                          size={20}
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-baseline gap-2">
                           <span className="font-medium text-foreground-text">{activity.name}</span>
@@ -233,9 +271,10 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                       key={activity.id}
                       className="flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm"
                     >
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: activity.color }}
+                      <CategoryIcon
+                        category={activity.category ?? 'warrior'}
+                        color={activity.color}
+                        size={14}
                       />
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-foreground-text text-sm">{activity.name}</span>
