@@ -43,7 +43,8 @@ export function normalizeQuest(raw: Record<string, unknown>): Activity {
     rawArchetype === 'scholar' ||
     rawArchetype === 'adventurer' ||
     rawArchetype === 'artisan' ||
-    rawArchetype === 'alchemist'
+    rawArchetype === 'alchemist' ||
+    rawArchetype === 'bard'
       ? rawArchetype
       : 'warrior';
 

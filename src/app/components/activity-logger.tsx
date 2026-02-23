@@ -1,7 +1,8 @@
-import React, { useState, type FormEvent } from 'react';
+import React, { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import type { Activity } from '../types';
 import { getTodayLocal } from '../utils/date';
+import { ArchetypeIcon } from './archetype-icon';
 
 interface ActivityLoggerProps {
   activities: Activity[];
@@ -18,6 +19,26 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
   const selectedQuest = campaigns.find((a) => a.id === selectedActivity);
   const isSessionQuest = selectedQuest?.goals[0]?.unit === 'sessions';
   const submitLabel = isSessionQuest ? 'Log Mission Report' : 'Log Mission Report';
+
+  const [campaignSelectOpen, setCampaignSelectOpen] = useState(false);
+  const campaignSelectRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!campaignSelectOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (campaignSelectRef.current && !campaignSelectRef.current.contains(e.target as Node)) {
+        setCampaignSelectOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCampaignSelectOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [campaignSelectOpen]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -36,24 +57,68 @@ export function ActivityLogger({ activities, onLogActivity }: ActivityLoggerProp
     <div className="card">
       <h2 className="font-semibold text-foreground-text mb-4">Mission Report</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="quest" className="block text-sm font-medium text-foreground-secondary mb-2">
+        <div ref={campaignSelectRef} className="relative">
+          <label id="quest-label" htmlFor="quest" className="block text-sm font-medium text-foreground-secondary mb-2">
             Campaign
           </label>
-          <select
+          <button
+            type="button"
             id="quest"
-            value={selectedActivity}
-            onChange={(e) => setSelectedActivity(e.target.value)}
-            className="input-base"
-            required
+            aria-haspopup="listbox"
+            aria-expanded={campaignSelectOpen}
+            aria-labelledby="quest-label"
+            onClick={() => setCampaignSelectOpen((prev) => !prev)}
+            className="input-base w-full flex items-center gap-2 text-left min-h-[2.25rem]"
           >
-            <option value="">Select a campaign</option>
-            {campaigns.map((activity) => (
-              <option key={activity.id} value={activity.id}>
-                {activity.name}
-              </option>
-            ))}
-          </select>
+            {selectedQuest ? (
+              <>
+                <ArchetypeIcon
+                  archetype={selectedQuest.archetype ?? 'warrior'}
+                  color={selectedQuest.color}
+                  size={18}
+                />
+                <span>{selectedQuest.name}</span>
+              </>
+            ) : (
+              <span className="text-foreground-muted">Select a campaign</span>
+            )}
+          </button>
+          <input
+            type="hidden"
+            name="quest"
+            value={selectedActivity}
+            required
+            aria-hidden
+          />
+          {campaignSelectOpen && (
+            <ul
+              role="listbox"
+              aria-labelledby="quest-label"
+              className="absolute z-50 mt-1 w-full max-w-[calc(100vw-2rem)] rounded-card border border-[var(--color-tertiary)] bg-[var(--color-foreground)] shadow-lg max-h-60 overflow-y-auto py-1"
+            >
+              {campaigns.map((activity) => (
+                <li
+                  key={activity.id}
+                  role="option"
+                  aria-selected={selectedActivity === activity.id}
+                  onClick={() => {
+                    setSelectedActivity(activity.id);
+                    setCampaignSelectOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                    selectedActivity === activity.id ? 'bg-[var(--color-primary)]/15 text-foreground-text' : 'hover:bg-black/5 text-foreground-text'
+                  }`}
+                >
+                  <ArchetypeIcon
+                    archetype={activity.archetype ?? 'warrior'}
+                    color={activity.color}
+                    size={18}
+                  />
+                  <span>{activity.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {!isSessionQuest && (

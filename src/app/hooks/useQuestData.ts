@@ -76,19 +76,29 @@ export function useQuestData() {
     setQuests((prev) => prev.filter((q) => q.id !== id));
   }, []);
 
-  const addLog = useCallback((questId: string, hours: number | undefined, date: string, title?: string | null) => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID?.() ?? Date.now().toString(),
-        activityId: questId,
-        ...(hours != null ? { hours } : {}),
-        date,
-        submittedAt: new Date().toISOString(),
-        ...(title != null && title !== '' ? { title } : {}),
-      },
-    ]);
-  }, []);
+  const addLog = useCallback(
+    (
+      questId: string,
+      hours: number | undefined,
+      date: string,
+      title?: string | null,
+      notes?: string | null,
+    ) => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID?.() ?? Date.now().toString(),
+          activityId: questId,
+          ...(hours != null ? { hours } : {}),
+          date,
+          submittedAt: new Date().toISOString(),
+          ...(title != null && title !== '' ? { title } : {}),
+          ...(notes != null && notes !== '' ? { notes } : {}),
+        },
+      ]);
+    },
+    [],
+  );
 
   const deleteLog = useCallback((id: string) => {
     setLogs((prev) => prev.filter((log) => log.id !== id));

@@ -1,19 +1,22 @@
 /// <reference path="../../vite-env.d.ts" />
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ActivityArchetype } from '../types';
+import { ACTIVITY_ARCHETYPES } from '../types';
 
 import crossedSwordsRaw from '../../assets/crossed-swords.svg?raw';
 import bookmarkletRaw from '../../assets/bookmarklet.svg?raw';
 import conqueror from '../../assets/conqueror.svg?raw';
-import stoneCraftingRaw from '../../assets/stone-crafting.svg?raw';
+import pencilBrush from '../../assets/pencil-brush.svg?raw';
 import heartBottleRaw from '../../assets/heart-bottle.svg?raw';
+import beerStein from '../../assets/beer-stein.svg?raw';
 
 const SVG_RAW_BY_ARCHETYPE: Record<ActivityArchetype, string> = {
   warrior: crossedSwordsRaw,
   scholar: bookmarkletRaw,
   adventurer: conqueror,
-  artisan: stoneCraftingRaw,
+  artisan: pencilBrush,
   alchemist: heartBottleRaw,
+  bard: beerStein,
 };
 
 function svgWithFill(svg: string, fill: string): string {
@@ -58,4 +61,96 @@ export const ACTIVITY_ARCHETYPE_LABELS: Record<ActivityArchetype, string> = {
   adventurer: 'Adventurer',
   artisan: 'Artisan',
   alchemist: 'Alchemist',
+  bard: 'Bard',
 };
+
+const DEFAULT_ICON_COLOR = '#6b7280';
+
+interface ArchetypeSelectProps {
+  id: string;
+  value: ActivityArchetype;
+  onChange: (archetype: ActivityArchetype) => void;
+  /** Color used for the archetype icons in the dropdown and trigger. */
+  iconColor: string;
+  'aria-labelledby'?: string;
+  className?: string;
+}
+
+/**
+ * Custom dropdown for selecting an archetype, with icon + label per option.
+ * Use instead of a native select when icons should appear next to each option.
+ */
+export function ArchetypeSelect({
+  id,
+  value,
+  onChange,
+  iconColor,
+  'aria-labelledby': ariaLabelledBy,
+  className = '',
+}: ArchetypeSelectProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const color = iconColor || DEFAULT_ICON_COLOR;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={ariaLabelledBy}
+        aria-activedescendant={open ? `${id}-option-${value}` : undefined}
+        onClick={() => setOpen((prev) => !prev)}
+        className="input-base w-full flex items-center gap-2 text-left min-h-[2.25rem]"
+      >
+        <ArchetypeIcon archetype={value} color={color} size={18} />
+        <span>{ACTIVITY_ARCHETYPE_LABELS[value]}</span>
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          aria-labelledby={ariaLabelledBy}
+          className="absolute z-50 mt-1 w-full rounded-card border border-[var(--color-tertiary)] bg-[var(--color-foreground)] shadow-lg max-h-60 overflow-y-auto py-1"
+        >
+          {ACTIVITY_ARCHETYPES.map((arch) => (
+            <li
+              key={arch}
+              id={`${id}-option-${arch}`}
+              role="option"
+              aria-selected={value === arch}
+              onClick={() => {
+                onChange(arch);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                value === arch ? 'bg-[var(--color-primary)]/15 text-foreground-text' : 'hover:bg-black/5 text-foreground-text'
+              }`}
+            >
+              <ArchetypeIcon archetype={arch} color={color} size={18} />
+              <span>{ACTIVITY_ARCHETYPE_LABELS[arch]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

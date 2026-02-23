@@ -7,7 +7,7 @@ export type QuestGoalTimeRange = (typeof QUEST_GOAL_TIME_RANGES)[number];
 export const ACTIVITY_KINDS = ['campaign', 'sideQuest'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
-export const ACTIVITY_ARCHETYPES = ['warrior', 'scholar', 'adventurer', 'artisan', 'alchemist'] as const;
+export const ACTIVITY_ARCHETYPES = ['warrior', 'scholar', 'adventurer', 'artisan', 'alchemist', 'bard'] as const;
 export type ActivityArchetype = (typeof ACTIVITY_ARCHETYPES)[number];
 
 export interface QuestGoal {
@@ -39,6 +39,8 @@ export interface ActivityLog {
   date: string;
   /** Optional title for this specific log entry */
   title?: string | null;
+  /** Optional notes for this log entry */
+  notes?: string | null;
   /** ISO timestamp when the log was submitted */
   submittedAt?: string | null;
 }

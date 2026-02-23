@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Clock } from 'lucide-react';
+import { Trash2, Clock, X } from 'lucide-react';
 import type { Activity, ActivityLog } from '../types';
 import { parseLocalDate } from '../utils/date';
 import { ArchetypeIcon } from './archetype-icon';
@@ -12,6 +12,7 @@ interface RecentLogsProps {
 
 export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
+  const [viewLogId, setViewLogId] = useState<string | null>(null);
 
   const sortedLogs = [...logs].sort((a, b) => {
     const aSubmitted = a.submittedAt ? new Date(a.submittedAt).getTime() : parseLocalDate(a.date).getTime();
@@ -48,6 +49,18 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
     return `Logged ${datePart} at ${timePart}`;
   };
 
+  const formatDateFull = (dateString: string) => {
+    return parseLocalDate(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const viewLog = viewLogId ? logs.find((l) => l.id === viewLogId) : null;
+  const viewActivity = viewLog ? activities.find((a) => a.id === viewLog.activityId) : null;
+
   return (
     <div className="card">
       <h2 className="font-semibold text-foreground-text mb-4">Mission Reports</h2>
@@ -69,7 +82,11 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 key={log.id}
                 className="flex items-center justify-between p-3 rounded-card border border-border bg-surface-muted hover:bg-surface-subtle transition-colors"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setViewLogId(log.id)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                >
                   <ArchetypeIcon
                     archetype={activity.archetype ?? 'warrior'}
                     color={activity.color}
@@ -92,10 +109,13 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                       )}
                     </div>
                   </div>
-                </div>
+                </button>
                 <button
                   type="button"
-                  onClick={() => setConfirmDeleteLogId(log.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteLogId(log.id);
+                  }}
                   className="text-destructive hover:text-destructive-hover transition-colors p-2 rounded flex-shrink-0"
                   aria-label="Delete log"
                 >
@@ -104,6 +124,74 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {viewLog && viewActivity && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="view-log-title"
+        >
+          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 id="view-log-title" className="font-semibold text-foreground-text flex items-center gap-2">
+                <ArchetypeIcon
+                  archetype={viewActivity.archetype ?? 'warrior'}
+                  color={viewActivity.color}
+                  size={20}
+                />
+                {viewActivity.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setViewLogId(null)}
+                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-4">
+              {viewLog.hours != null && (
+                <div>
+                  <div className="text-sm font-medium text-foreground-secondary mb-1">Hours spent</div>
+                  <div className="text-foreground-text">{viewLog.hours} {viewLog.hours === 1 ? 'hour' : 'hours'}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-sm font-medium text-foreground-secondary mb-1">Date accomplished</div>
+                <div className="text-foreground-text">{formatDateFull(viewLog.date)}</div>
+              </div>
+              {(viewLog.title != null && viewLog.title.trim() !== '') && (
+                <div>
+                  <div className="text-sm font-medium text-foreground-secondary mb-1">Title</div>
+                  <div className="text-foreground-text">{viewLog.title.trim()}</div>
+                </div>
+              )}
+              {(viewLog.notes != null && viewLog.notes.trim() !== '') && (
+                <div>
+                  <div className="text-sm font-medium text-foreground-secondary mb-1">Notes</div>
+                  <div className="text-foreground-text whitespace-pre-wrap">{viewLog.notes.trim()}</div>
+                </div>
+              )}
+              {viewLog.submittedAt && (
+                <div className="pt-2 border-t border-border">
+                  <div className="text-sm text-foreground-muted">{formatLoggedAt(viewLog.submittedAt)}</div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setViewLogId(null)}
+                className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

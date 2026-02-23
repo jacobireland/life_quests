@@ -3,9 +3,9 @@ import { Plus, Trash2, X } from 'lucide-react';
 import type { Activity, ActivityArchetype, ActivityKind, NewQuestData, QuestGoal } from '../types';
 import { ACTIVITY_ARCHETYPES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
 import { getTodayLocal } from '../utils/date';
-import { ArchetypeIcon, ACTIVITY_ARCHETYPE_LABELS } from './archetype-icon';
+import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon, ArchetypeSelect } from './archetype-icon';
 
-const DEFAULT_COLOR = '#3b82f6';
+const DEFAULT_COLOR = '#000000';
 
 const DEFAULT_GOAL: QuestGoal = { amount: 2, unit: 'hours', timeRange: 'week' };
 
@@ -56,18 +56,33 @@ export function ActivityManager({
     }
   }, [editModalOpen, displayActivities, selectedQuestId]);
 
-  const sortedActivities = useMemo(() => {
-    return [...displayActivities].sort((a, b) => {
-      if (managerTab === 'sideQuests') {
-        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      }
-      const aRange = a.goals[0]?.timeRange;
-      const bRange = b.goals[0]?.timeRange;
-      const aIdx = aRange ? TIME_RANGE_ORDER.indexOf(aRange) : TIME_RANGE_ORDER.length;
-      const bIdx = bRange ? TIME_RANGE_ORDER.indexOf(bRange) : TIME_RANGE_ORDER.length;
-      if (aIdx !== bIdx) return aIdx - bIdx;
+  const sortActivity = (a: Activity, b: Activity) => {
+    if (managerTab === 'sideQuests') {
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-    });
+    }
+    const aRange = a.goals[0]?.timeRange;
+    const bRange = b.goals[0]?.timeRange;
+    const aIdx = aRange ? TIME_RANGE_ORDER.indexOf(aRange) : TIME_RANGE_ORDER.length;
+    const bIdx = bRange ? TIME_RANGE_ORDER.indexOf(bRange) : TIME_RANGE_ORDER.length;
+    if (aIdx !== bIdx) return aIdx - bIdx;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  };
+
+  /** Groups display activities by archetype; only includes archetypes that have at least one. */
+  const activitiesByArchetype = useMemo(() => {
+    const byArchetype = new Map<ActivityArchetype, Activity[]>();
+    for (const a of displayActivities) {
+      const arch = a.archetype ?? 'warrior';
+      const list = byArchetype.get(arch) ?? [];
+      list.push(a);
+      byArchetype.set(arch, list);
+    }
+    return ACTIVITY_ARCHETYPES.filter((arch) => (byArchetype.get(arch)?.length ?? 0) > 0)
+      .sort((a, b) => (byArchetype.get(b)?.length ?? 0) - (byArchetype.get(a)?.length ?? 0))
+      .map((archetype) => ({
+        archetype,
+        activities: [...(byArchetype.get(archetype) ?? [])].sort(sortActivity),
+      }));
   }, [displayActivities, managerTab]);
 
   const handleUpdateGoal = (field: keyof QuestGoal, value: number | string) => {
@@ -144,47 +159,55 @@ export function ActivityManager({
         ))}
       </div>
 
-      <div className="space-y-2 mb-4">
-        {sortedActivities.length === 0 ? (
+      <div className="space-y-4 mb-4">
+        {activitiesByArchetype.length === 0 ? (
           <p className="text-foreground-subtle text-sm">
             {managerTab === 'campaigns' ? 'No campaigns yet. Add one below!' : 'No side quests yet. Add one below!'}
           </p>
         ) : (
-          sortedActivities.map((activity) => {
-            const goal = activity.goals[0];
-            const timeRangeLabel =
-              managerTab === 'campaigns' && goal
-                ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives', year: 'Yearly Objectives' }[goal.timeRange]
-                : null;
-            return (
-              <button
-                key={activity.id}
-                type="button"
-                onClick={() => {
-                  setSelectedQuestId(activity.id);
-                  setEditModalOpen(true);
-                }}
-                className="w-full flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
-              >
-                <ArchetypeIcon
-                  archetype={activity.archetype ?? 'warrior'}
-                  color={activity.color}
-                  size={20}
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="text-foreground-text font-medium">{activity.name}</span>
-                  {managerTab === 'sideQuests' && activity.notes && (
-                    <p className="text-foreground-muted text-sm mt-0.5 line-clamp-2">{activity.notes}</p>
-                  )}
-                </div>
-                {timeRangeLabel && (
-                  <span className="text-foreground-muted text-sm ml-auto flex-shrink-0">
-                    {timeRangeLabel}
-                  </span>
-                )}
-              </button>
-            );
-          })
+          activitiesByArchetype.map(({ archetype, activities }) => (
+            <section key={archetype} className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
+                <ArchetypeIcon archetype={archetype} color="#6b7280" size={16} />
+                {ACTIVITY_ARCHETYPE_LABELS[archetype]}
+              </h3>
+              {activities.map((activity) => {
+                const goal = activity.goals[0];
+                const timeRangeLabel =
+                  managerTab === 'campaigns' && goal
+                    ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives', year: 'Yearly Objectives' }[goal.timeRange]
+                    : null;
+                return (
+                  <button
+                    key={activity.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedQuestId(activity.id);
+                      setEditModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
+                  >
+                    <ArchetypeIcon
+                      archetype={activity.archetype ?? 'warrior'}
+                      color={activity.color}
+                      size={20}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-foreground-text font-medium">{activity.name}</span>
+                      {managerTab === 'sideQuests' && activity.notes && (
+                        <p className="text-foreground-muted text-sm mt-0.5 line-clamp-2">{activity.notes}</p>
+                      )}
+                    </div>
+                    {timeRangeLabel && (
+                      <span className="text-foreground-muted text-sm ml-auto flex-shrink-0">
+                        {timeRangeLabel}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </section>
+          ))
         )}
       </div>
 
@@ -238,19 +261,16 @@ export function ActivityManager({
                 </div>
 
                 <div>
-                  <label htmlFor="new-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  <label id="new-quest-archetype-label" htmlFor="new-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
                     Archetype
                   </label>
-                  <select
+                  <ArchetypeSelect
                     id="new-quest-archetype"
                     value={newQuestArchetype}
-                    onChange={(e) => setNewQuestArchetype(e.target.value as ActivityArchetype)}
-                    className="input-base"
-                  >
-                    {ACTIVITY_ARCHETYPES.map((arch) => (
-                      <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
-                    ))}
-                  </select>
+                    onChange={setNewQuestArchetype}
+                    iconColor={newQuestColor}
+                    aria-labelledby="new-quest-archetype-label"
+                  />
                 </div>
 
                 {managerTab === 'sideQuests' ? (
@@ -580,19 +600,16 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
               />
             </div>
             <div>
-              <label htmlFor="edit-side-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label id="edit-side-quest-archetype-label" htmlFor="edit-side-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
                 Archetype
               </label>
-              <select
+              <ArchetypeSelect
                 id="edit-side-quest-archetype"
                 value={archetype}
-                onChange={(e) => setArchetype(e.target.value as ActivityArchetype)}
-                className="input-base"
-              >
-                {ACTIVITY_ARCHETYPES.map((arch) => (
-                  <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
-                ))}
-              </select>
+                onChange={setArchetype}
+                iconColor={color}
+                aria-labelledby="edit-side-quest-archetype-label"
+              />
             </div>
             <div>
               <label htmlFor="edit-side-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
@@ -655,19 +672,16 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
               </div>
             </div>
             <div>
-              <label htmlFor="edit-campaign-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label id="edit-campaign-archetype-label" htmlFor="edit-campaign-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
                 Archetype
               </label>
-              <select
+              <ArchetypeSelect
                 id="edit-campaign-archetype"
                 value={archetype}
-                onChange={(e) => setArchetype(e.target.value as ActivityArchetype)}
-                className="input-base"
-              >
-                {ACTIVITY_ARCHETYPES.map((arch) => (
-                  <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
-                ))}
-              </select>
+                onChange={setArchetype}
+                iconColor={color}
+                aria-labelledby="edit-campaign-archetype-label"
+              />
             </div>
             <div>
               <label htmlFor="edit-campaign-color" className="block text-sm font-medium text-foreground-secondary mb-2">

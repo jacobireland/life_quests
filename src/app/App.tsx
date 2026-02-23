@@ -1,7 +1,6 @@
 import React from 'react';
 import { BarChart3 } from 'lucide-react';
 import { useQuestData } from './hooks/useQuestData';
-import { ActivityLogger } from './components/activity-logger';
 import { ActivityManager } from './components/activity-manager';
 import { ActivityStats } from './components/activity-stats';
 import { RecentLogs } from './components/recent-logs';
@@ -28,7 +27,6 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
-            <ActivityLogger activities={quests} onLogActivity={addLog} />
             <ActivityManager
               activities={quests}
               onAddQuest={addQuest}
@@ -38,7 +36,7 @@ export default function App() {
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <ActivityStats activities={quests} logs={logs} />
+            <ActivityStats activities={quests} logs={logs} onLogActivity={addLog} />
             <RecentLogs
               activities={quests}
               logs={logs}
