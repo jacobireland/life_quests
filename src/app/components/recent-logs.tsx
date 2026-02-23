@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Trash2, Clock } from 'lucide-react';
 import type { Activity, ActivityLog } from '../types';
 import { parseLocalDate } from '../utils/date';
-import { CategoryIcon } from './category-icon';
+import { ArchetypeIcon } from './archetype-icon';
 
 interface RecentLogsProps {
   activities: Activity[];
@@ -70,8 +70,8 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 className="flex items-center justify-between p-3 rounded-card border border-border bg-surface-muted hover:bg-surface-subtle transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <CategoryIcon
-                    category={activity.category ?? 'warrior'}
+                  <ArchetypeIcon
+                    archetype={activity.archetype ?? 'warrior'}
                     color={activity.color}
                     size={18}
                   />

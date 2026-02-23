@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
 import { parseLocalDate } from '../utils/date';
-import { CategoryIcon } from './category-icon';
+import { ArchetypeIcon } from './archetype-icon';
 
 const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
 type TimeRangeTab = (typeof TIME_RANGES)[number];
@@ -196,8 +196,8 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                 key={activity.id}
                 className="flex items-start gap-3 p-3 rounded-card border border-border bg-surface-muted"
               >
-                <CategoryIcon
-                  category={activity.category ?? 'warrior'}
+                <ArchetypeIcon
+                  archetype={activity.archetype ?? 'warrior'}
                   color={activity.color}
                   size={20}
                   className="mt-0.5"
@@ -232,8 +232,8 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                       className="flex flex-col gap-1.5 p-3 rounded-card border border-border bg-surface-muted"
                     >
                       <div className="flex items-center gap-3">
-                        <CategoryIcon
-                          category={activity.category ?? 'warrior'}
+                        <ArchetypeIcon
+                          archetype={activity.archetype ?? 'warrior'}
                           color={activity.color}
                           size={20}
                         />
@@ -271,8 +271,8 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                       key={activity.id}
                       className="flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm"
                     >
-                      <CategoryIcon
-                        category={activity.category ?? 'warrior'}
+                      <ArchetypeIcon
+                        archetype={activity.archetype ?? 'warrior'}
                         color={activity.color}
                         size={14}
                       />

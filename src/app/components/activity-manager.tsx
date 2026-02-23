@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
-import type { Activity, ActivityCategory, ActivityKind, NewQuestData, QuestGoal } from '../types';
-import { ACTIVITY_CATEGORIES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
+import type { Activity, ActivityArchetype, ActivityKind, NewQuestData, QuestGoal } from '../types';
+import { ACTIVITY_ARCHETYPES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
 import { getTodayLocal } from '../utils/date';
-import { CategoryIcon, ACTIVITY_CATEGORY_LABELS } from './category-icon';
+import { ArchetypeIcon, ACTIVITY_ARCHETYPE_LABELS } from './archetype-icon';
 
 const DEFAULT_COLOR = '#3b82f6';
 
@@ -29,7 +29,7 @@ export function ActivityManager({
 }: ActivityManagerProps) {
   const [newQuestName, setNewQuestName] = useState('');
   const [newQuestNotes, setNewQuestNotes] = useState('');
-  const [newQuestCategory, setNewQuestCategory] = useState<ActivityCategory>('warrior');
+  const [newQuestArchetype, setNewQuestArchetype] = useState<ActivityArchetype>('warrior');
   const [newQuestColor, setNewQuestColor] = useState(DEFAULT_COLOR);
   const [newQuestGoals, setNewQuestGoals] = useState<QuestGoal[]>([{ ...DEFAULT_GOAL }]);
   const [newQuestStartDate, setNewQuestStartDate] = useState(getTodayLocal());
@@ -89,11 +89,11 @@ export function ActivityManager({
         endDate: null,
         kind: 'sideQuest',
         notes: newQuestNotes.trim() || null,
-        category: newQuestCategory,
+        archetype: newQuestArchetype,
       });
       setNewQuestName('');
       setNewQuestNotes('');
-      setNewQuestCategory('warrior');
+      setNewQuestArchetype('warrior');
     } else {
       onAddQuest({
         name: newQuestName.trim(),
@@ -102,14 +102,14 @@ export function ActivityManager({
         startDate: newQuestStartDate,
         endDate: newQuestEndDate || null,
         kind: 'campaign',
-        category: newQuestCategory,
+        archetype: newQuestArchetype,
       });
       setNewQuestName('');
       setNewQuestColor(DEFAULT_COLOR);
       setNewQuestGoals([{ ...DEFAULT_GOAL }]);
       setNewQuestStartDate(getTodayLocal());
       setNewQuestEndDate(null);
-      setNewQuestCategory('warrior');
+      setNewQuestArchetype('warrior');
     }
     setAddModalOpen(false);
   };
@@ -117,7 +117,7 @@ export function ActivityManager({
   const resetAddForm = () => {
     setNewQuestName('');
     setNewQuestNotes('');
-    setNewQuestCategory('warrior');
+    setNewQuestArchetype('warrior');
     setNewQuestColor(DEFAULT_COLOR);
     setNewQuestGoals([{ ...DEFAULT_GOAL }]);
     setNewQuestStartDate(getTodayLocal());
@@ -166,8 +166,8 @@ export function ActivityManager({
                 }}
                 className="w-full flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
               >
-                <CategoryIcon
-                  category={activity.category ?? 'warrior'}
+                <ArchetypeIcon
+                  archetype={activity.archetype ?? 'warrior'}
                   color={activity.color}
                   size={20}
                 />
@@ -238,17 +238,17 @@ export function ActivityManager({
                 </div>
 
                 <div>
-                  <label htmlFor="new-quest-category" className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Category
+                  <label htmlFor="new-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Archetype
                   </label>
                   <select
-                    id="new-quest-category"
-                    value={newQuestCategory}
-                    onChange={(e) => setNewQuestCategory(e.target.value as ActivityCategory)}
+                    id="new-quest-archetype"
+                    value={newQuestArchetype}
+                    onChange={(e) => setNewQuestArchetype(e.target.value as ActivityArchetype)}
                     className="input-base"
                   >
-                    {ACTIVITY_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{ACTIVITY_CATEGORY_LABELS[cat]}</option>
+                    {ACTIVITY_ARCHETYPES.map((arch) => (
+                      <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
                     ))}
                   </select>
                 </div>
@@ -528,7 +528,7 @@ interface EditQuestFormProps {
 function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormProps) {
   const [name, setName] = useState(quest.name);
   const [notes, setNotes] = useState(quest.notes ?? '');
-  const [category, setCategory] = useState<ActivityCategory>(quest.category ?? 'warrior');
+  const [archetype, setArchetype] = useState<ActivityArchetype>(quest.archetype ?? 'warrior');
   const [color, setColor] = useState(quest.color);
   const [goal, setGoal] = useState<QuestGoal>(
     quest.goals.length > 0 ? quest.goals[0] : { ...DEFAULT_GOAL },
@@ -543,9 +543,9 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (isSideQuest) {
-      onSave({ name: name.trim(), notes: notes.trim() || null, color, category });
+      onSave({ name: name.trim(), notes: notes.trim() || null, color, archetype });
     } else {
-      onSave({ name: name.trim(), color, goals: [goal], startDate, endDate, category });
+      onSave({ name: name.trim(), color, goals: [goal], startDate, endDate, archetype });
     }
   };
 
@@ -580,17 +580,17 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
               />
             </div>
             <div>
-              <label htmlFor="edit-side-quest-category" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Category
+              <label htmlFor="edit-side-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Archetype
               </label>
               <select
-                id="edit-side-quest-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ActivityCategory)}
+                id="edit-side-quest-archetype"
+                value={archetype}
+                onChange={(e) => setArchetype(e.target.value as ActivityArchetype)}
                 className="input-base"
               >
-                {ACTIVITY_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{ACTIVITY_CATEGORY_LABELS[cat]}</option>
+                {ACTIVITY_ARCHETYPES.map((arch) => (
+                  <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
                 ))}
               </select>
             </div>
@@ -655,17 +655,17 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
               </div>
             </div>
             <div>
-              <label htmlFor="edit-campaign-category" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Category
+              <label htmlFor="edit-campaign-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Archetype
               </label>
               <select
-                id="edit-campaign-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ActivityCategory)}
+                id="edit-campaign-archetype"
+                value={archetype}
+                onChange={(e) => setArchetype(e.target.value as ActivityArchetype)}
                 className="input-base"
               >
-                {ACTIVITY_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{ACTIVITY_CATEGORY_LABELS[cat]}</option>
+                {ACTIVITY_ARCHETYPES.map((arch) => (
+                  <option key={arch} value={arch}>{ACTIVITY_ARCHETYPE_LABELS[arch]}</option>
                 ))}
               </select>
             </div>

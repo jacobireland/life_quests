@@ -7,8 +7,8 @@ export type QuestGoalTimeRange = (typeof QUEST_GOAL_TIME_RANGES)[number];
 export const ACTIVITY_KINDS = ['campaign', 'sideQuest'] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
-export const ACTIVITY_CATEGORIES = ['warrior', 'scholar', 'adventurer', 'craftsman'] as const;
-export type ActivityCategory = (typeof ACTIVITY_CATEGORIES)[number];
+export const ACTIVITY_ARCHETYPES = ['warrior', 'scholar', 'adventurer', 'artisan', 'alchemist'] as const;
+export type ActivityArchetype = (typeof ACTIVITY_ARCHETYPES)[number];
 
 export interface QuestGoal {
   amount: number;
@@ -27,8 +27,8 @@ export interface Activity {
   kind?: ActivityKind;
   /** Optional notes; used for side quests. */
   notes?: string | null;
-  /** Category for icon and grouping. Defaults to 'warrior'. */
-  category?: ActivityCategory;
+  /** Archetype for icon and grouping. Defaults to 'warrior'. */
+  archetype?: ActivityArchetype;
 }
 
 export interface ActivityLog {

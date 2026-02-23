@@ -61,7 +61,7 @@ export function useQuestData() {
         endDate: data.endDate ?? null,
         kind: data.kind ?? 'campaign',
         notes: data.notes ?? null,
-        category: data.category ?? 'warrior',
+        archetype: data.archetype ?? 'warrior',
       },
     ]);
   }, []);
