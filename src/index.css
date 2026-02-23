@@ -4,18 +4,18 @@
 
 :root {
   /* Background (page) */
-  --color-background: #2D2D2A;
-  --color-background-text: #EFE7DA;
+  --color-background: #eeeeee;
+  --color-background-text: #000000;
 
   /* Foreground (cards, panels) */
-  --color-foreground: #EFE7DA;
+  --color-foreground: #ffffff;
   --color-foreground-text: #020712;
   --color-foreground-text-hover: #374151;
 
   /* Accent */
   --color-primary: #0051ff;
-  --color-secondary: #efe7da;
-  --color-tertiary: #9ca3af;
+  --color-secondary: #eeeeee;
+  --color-tertiary: #eeeeee;
 
   /* Miscellaneous (quest dots, destructive, etc.) */
   --color-destructive: #ef4444;
@@ -64,7 +64,7 @@
     background-color: var(--color-foreground);
   }
   .input-base::placeholder {
-    color: var(--color-tertiary);
+    color: var(--color-foreground-text-hover);
   }
   .input-base:focus {
     outline: none;

@@ -1,4 +1,4 @@
-import type { Activity, QuestGoal } from '../types';
+import type { Activity, ActivityKind, QuestGoal } from '../types';
 import { getTodayLocal } from '../utils/date';
 
 /**
@@ -8,6 +8,8 @@ export function normalizeQuest(raw: Record<string, unknown>): Activity {
   const id = typeof raw.id === 'string' ? raw.id : '';
   const name = typeof raw.name === 'string' ? raw.name : '';
   const color = typeof raw.color === 'string' ? raw.color : '#6b7280';
+  const kind: ActivityKind =
+    raw.kind === 'sideQuest' || raw.kind === 'campaign' ? raw.kind : 'campaign';
   const allGoals = Array.isArray(raw.goals)
     ? (raw.goals as unknown[]).filter(
         (g): g is QuestGoal =>
@@ -29,5 +31,5 @@ export function normalizeQuest(raw: Record<string, unknown>): Activity {
         ? raw.endDate
         : null;
 
-  return { id, name, color, goals, startDate, endDate };
+  return { id, name, color, goals, startDate, endDate, kind };
 }

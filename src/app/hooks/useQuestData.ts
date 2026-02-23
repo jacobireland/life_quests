@@ -59,6 +59,7 @@ export function useQuestData() {
         goals: data.goals ?? [],
         startDate: data.startDate ?? getTodayLocal(),
         endDate: data.endDate ?? null,
+        kind: data.kind ?? 'campaign',
       },
     ]);
   }, []);
@@ -73,14 +74,16 @@ export function useQuestData() {
     setQuests((prev) => prev.filter((q) => q.id !== id));
   }, []);
 
-  const addLog = useCallback((questId: string, hours: number, date: string) => {
+  const addLog = useCallback((questId: string, hours: number | undefined, date: string, title?: string | null) => {
     setLogs((prev) => [
       ...prev,
       {
         id: crypto.randomUUID?.() ?? Date.now().toString(),
         activityId: questId,
-        hours,
+        ...(hours != null ? { hours } : {}),
         date,
+        submittedAt: new Date().toISOString(),
+        ...(title != null && title !== '' ? { title } : {}),
       },
     ]);
   }, []);

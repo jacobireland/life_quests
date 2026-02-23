@@ -1,6 +1,6 @@
-import React, { useState, type FormEvent } from 'react';
+import React, { useMemo, useState, type FormEvent } from 'react';
 import { Plus, Trash2, Pencil, X } from 'lucide-react';
-import type { Activity, NewQuestData, QuestGoal } from '../types';
+import type { Activity, ActivityKind, NewQuestData, QuestGoal } from '../types';
 import { QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
 import { getTodayLocal } from '../utils/date';
 
@@ -10,6 +10,11 @@ const PRESET_COLORS = [
 ];
 
 const DEFAULT_GOAL: QuestGoal = { amount: 2, unit: 'hours', timeRange: 'week' };
+
+const TIME_RANGE_ORDER = ['day', 'week', 'month', 'year'] as const;
+
+const MANAGER_TABS = ['campaigns', 'sideQuests'] as const;
+type ManagerTab = (typeof MANAGER_TABS)[number];
 
 interface ActivityManagerProps {
   activities: Activity[];
@@ -33,8 +38,27 @@ export function ActivityManager({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [confirmRemoveQuestId, setConfirmRemoveQuestId] = useState<string | null>(null);
+  const [managerTab, setManagerTab] = useState<ManagerTab>('campaigns');
 
   const selectedQuest = selectedQuestId ? activities.find((a) => a.id === selectedQuestId) : null;
+
+  const { campaigns, sideQuests, displayActivities } = useMemo(() => {
+    const campaigns = activities.filter((a) => (a.kind ?? 'campaign') === 'campaign');
+    const sideQuests = activities.filter((a) => a.kind === 'sideQuest');
+    const displayActivities = managerTab === 'campaigns' ? campaigns : sideQuests;
+    return { campaigns, sideQuests, displayActivities };
+  }, [activities, managerTab]);
+
+  const sortedActivities = useMemo(() => {
+    return [...displayActivities].sort((a, b) => {
+      const aRange = a.goals[0]?.timeRange;
+      const bRange = b.goals[0]?.timeRange;
+      const aIdx = aRange ? TIME_RANGE_ORDER.indexOf(aRange) : TIME_RANGE_ORDER.length;
+      const bIdx = bRange ? TIME_RANGE_ORDER.indexOf(bRange) : TIME_RANGE_ORDER.length;
+      if (aIdx !== bIdx) return aIdx - bIdx;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+  }, [displayActivities]);
 
   const handleUpdateGoal = (field: keyof QuestGoal, value: number | string) => {
     setNewQuestGoals((prev) => [
@@ -45,12 +69,14 @@ export function ActivityManager({
   const handleAddSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!newQuestName.trim()) return;
+    const kind: ActivityKind = managerTab === 'campaigns' ? 'campaign' : 'sideQuest';
     onAddQuest({
       name: newQuestName.trim(),
       color: newQuestColor,
       goals: newQuestGoals,
       startDate: newQuestStartDate,
       endDate: newQuestEndDate || null,
+      kind,
     });
     setNewQuestName('');
     setNewQuestColor(PRESET_COLORS[0]);
@@ -71,16 +97,33 @@ export function ActivityManager({
 
   return (
     <div className="card">
-      <h2 className="font-semibold text-foreground-text mb-4">Manage Quests</h2>
+      <div className="flex mt-4 mb-4 gap-0.5 pb-0 bg-surface-subtle rounded-t-card border-b border-border border-opacity-60">
+        {MANAGER_TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setManagerTab(tab)}
+            className={`flex-1 px-4 py-2.5 text-base font-bold transition-colors rounded-t-md ${
+              managerTab === tab
+                ? 'bg-surface-card text-foreground-text border border-border border-b-0 border-opacity-60 -mb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]'
+                : 'bg-transparent text-foreground-secondary hover:bg-black/5 rounded-b-md'
+            }`}
+          >
+            {tab === 'campaigns' ? 'My Campaigns' : 'My Side Quests'}
+          </button>
+        ))}
+      </div>
 
       <div className="space-y-2 mb-4">
-        {activities.length === 0 ? (
-          <p className="text-foreground-subtle text-sm">No quests yet. Add one below!</p>
+        {sortedActivities.length === 0 ? (
+          <p className="text-foreground-subtle text-sm">
+            {managerTab === 'campaigns' ? 'No campaigns yet. Add one below!' : 'No side quests yet. Add one below!'}
+          </p>
         ) : (
-          activities.map((activity) => {
+          sortedActivities.map((activity) => {
             const goal = activity.goals[0];
             const timeRangeLabel = goal
-              ? { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' }[goal.timeRange]
+              ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives', year: 'Yearly Objectives' }[goal.timeRange]
               : null;
             return (
               <div
@@ -119,7 +162,7 @@ export function ActivityManager({
             className="flex-[2] border-2 border-dashed border-neutral-300 rounded-card px-4 py-3 text-foreground-muted hover:border-neutral-400 hover:text-foreground-secondary transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            New Quest
+            {managerTab === 'campaigns' ? 'New Campaign' : 'New Side Quest'}
           </button>
         </div>
       </div>
@@ -134,7 +177,7 @@ export function ActivityManager({
           <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h3 id="add-quest-title" className="font-semibold text-foreground-text">
-                Embark on a New Quest
+                Embark on a New Journey
               </h3>
               <button
                 type="button"
@@ -149,14 +192,14 @@ export function ActivityManager({
               <form onSubmit={handleAddSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="quest-title" className="block text-sm font-medium text-foreground-secondary mb-1">
-                    Title
+                    Name
                   </label>
                   <input
                     id="quest-title"
                     type="text"
                     value={newQuestName}
                     onChange={(e) => setNewQuestName(e.target.value)}
-                    placeholder="Quest title"
+                    placeholder="Campaign Name"
                     className="input-base"
                     autoFocus
                   />
@@ -164,7 +207,7 @@ export function ActivityManager({
 
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Quest goal
+                    Objectives
                   </label>
                   <p className="text-foreground-muted text-xs mb-2">
                     e.g. 2 hours every week, or 3 sessions per month
@@ -274,7 +317,7 @@ export function ActivityManager({
           <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h3 id="edit-quests-title" className="font-semibold text-foreground-text">
-                Edit Quests
+                Edit Campaign
               </h3>
               <button
                 type="button"
@@ -289,15 +332,17 @@ export function ActivityManager({
               </button>
             </div>
             <div className="p-4 overflow-y-auto flex-1">
-              {activities.length === 0 ? (
-                <p className="text-foreground-subtle text-sm">No quests yet.</p>
+              {displayActivities.length === 0 ? (
+                <p className="text-foreground-subtle text-sm">
+                  {managerTab === 'campaigns' ? 'No campaigns yet.' : 'No side quests yet.'}
+                </p>
               ) : (
                 <>
                   <p className="text-foreground-muted text-sm mb-3">
                     Select a quest to edit.
                   </p>
                   <ul className="space-y-1">
-                    {activities.map((activity) => (
+                    {displayActivities.map((activity) => (
                       <li key={activity.id}>
                         <button
                           type="button"
@@ -335,7 +380,7 @@ export function ActivityManager({
       )}
 
       {confirmRemoveQuestId && (() => {
-        const quest = activities.find((a) => a.id === confirmRemoveQuestId);
+        const quest = displayActivities.find((a) => a.id === confirmRemoveQuestId) ?? activities.find((a) => a.id === confirmRemoveQuestId);
         return (
           <div
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"

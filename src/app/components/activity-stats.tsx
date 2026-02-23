@@ -12,6 +12,9 @@ const TAB_LABELS: Record<TimeRangeTab, string> = {
   year: 'Yearly',
 };
 
+const STATS_KIND_TABS = ['campaignObjectives', 'sideQuests'] as const;
+type StatsKindTab = (typeof STATS_KIND_TABS)[number];
+
 interface ActivityStatsProps {
   activities: Activity[];
   logs: ActivityLog[];
@@ -74,14 +77,21 @@ function formatGoalLabel(goal: QuestGoal): string {
 }
 
 export function ActivityStats({ activities, logs }: ActivityStatsProps) {
+  const [kindTab, setKindTab] = useState<StatsKindTab>('campaignObjectives');
   const [activeTab, setActiveTab] = useState<TimeRangeTab>('week');
+
+  const displayActivities = useMemo(() => {
+    return kindTab === 'campaignObjectives'
+      ? activities.filter((a) => (a.kind ?? 'campaign') === 'campaign')
+      : activities.filter((a) => a.kind === 'sideQuest');
+  }, [activities, kindTab]);
 
   const { completed, current } = useMemo(() => {
     const bounds = getCurrentPeriodBounds(activeTab);
     const start = bounds.start.getTime();
     const end = bounds.end.getTime();
 
-    const questsInTab = activities.filter((a) => {
+    const questsInTab = displayActivities.filter((a) => {
       const goal = a.goals[0];
       return goal && goal.timeRange === activeTab;
     });
@@ -99,7 +109,7 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
 
       const logged =
         goal.unit === 'hours'
-          ? periodLogs.reduce((sum, log) => sum + log.hours, 0)
+          ? periodLogs.reduce((sum, log) => sum + (log.hours ?? 0), 0)
           : periodLogs.length;
       const target = goal.amount;
       const isCompleted = logged >= target;
@@ -109,7 +119,7 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
     }
 
     return { completed, current };
-  }, [activities, logs, activeTab]);
+  }, [displayActivities, logs, activeTab]);
 
   const getProgress = (activity: Activity): { logged: number; target: number; unit: string; percent: number } => {
     const goal = activity.goals[0]!;
@@ -123,7 +133,7 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
     });
     const logged =
       goal.unit === 'hours'
-        ? periodLogs.reduce((sum, log) => sum + log.hours, 0)
+        ? periodLogs.reduce((sum, log) => sum + (log.hours ?? 0), 0)
         : periodLogs.length;
     const target = goal.amount;
     const percent = target > 0 ? Math.min(100, (logged / target) * 100) : 0;
@@ -133,7 +143,22 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
 
   return (
     <div className="card">
-      <h2 className="font-semibold text-foreground-text mb-4">Ongoing Quests</h2>
+      <div className="flex mt-4 mb-6 gap-0.5 pb-0 bg-surface-subtle rounded-t-card border-b border-border border-opacity-60">
+        {STATS_KIND_TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setKindTab(tab)}
+            className={`flex-1 px-4 py-2.5 text-base font-bold transition-colors rounded-t-md ${
+              kindTab === tab
+                ? 'bg-surface-card text-foreground-text border border-border border-b-0 border-opacity-60 -mb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]'
+                : 'bg-transparent text-foreground-secondary hover:bg-black/5 rounded-b-md'
+            }`}
+          >
+            {tab === 'campaignObjectives' ? 'Campaign Objectives' : 'Side Quests'}
+          </button>
+        ))}
+      </div>
 
       <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
         {TIME_RANGES.map((tab) => (
@@ -154,42 +179,12 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
 
       {completed.length === 0 && current.length === 0 ? (
         <p className="text-foreground-subtle text-sm">
-          No quests with a {TAB_LABELS[activeTab].toLowerCase()} goal. Add a quest and set its goal to this period to see it here.
+          No {kindTab === 'campaignObjectives' ? 'campaigns' : 'side quests'} with a {TAB_LABELS[activeTab].toLowerCase()} goal. Add one and set its goal to this period to see it here.
         </p>
       ) : (
         <div className="space-y-6">
-          {completed.length > 0 && (
-            <section>
-              <h3 className="text-sm font-medium text-foreground-text mb-2">Completed Quests</h3>
-              <ul className="space-y-2">
-                {completed.map((activity) => {
-                  const goal = activity.goals[0]!;
-                  const progress = getProgress(activity);
-                  return (
-                    <li
-                      key={activity.id}
-                      className="flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted"
-                    >
-                      <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: activity.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-foreground-text">{activity.name}</span>
-                        <span className="text-foreground-muted text-sm ml-2">
-                          {formatGoalLabel(goal)} • {progress.logged} {progress.unit} logged
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
           {current.length > 0 && (
             <section>
-              <h3 className="text-sm font-medium text-foreground-text mb-2">Current Quests</h3>
               <ul className="space-y-3">
                 {current.map((activity) => {
                   const goal = activity.goals[0]!;
@@ -219,6 +214,42 @@ export function ActivityStats({ activities, logs }: ActivityStatsProps) {
                             backgroundColor: activity.color,
                           }}
                         />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {completed.length > 0 && (
+            <section>
+              <ul className="space-y-1.5">
+                {completed.map((activity) => {
+                  const goal = activity.goals[0]!;
+                  const progress = getProgress(activity);
+                  return (
+                    <li
+                      key={activity.id}
+                      className="flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm"
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: activity.color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-foreground-text text-sm">{activity.name}</span>
+                        <span className="text-green-800/70 text-xs ml-1.5">
+                          {progress.logged} {progress.unit} logged
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end text-right">
+                        <span className="text-xs font-medium text-green-800 whitespace-nowrap">
+                          Checkpoint Achieved!
+                        </span>
+                        <span className="text-green-800/70 text-[11px] mt-0.5">
+                          {formatGoalLabel(goal)}
+                        </span>
                       </div>
                     </li>
                   );
