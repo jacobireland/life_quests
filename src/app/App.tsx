@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { useQuestData } from './hooks/useQuestData';
 import { ActivityManager } from './components/activity-manager';
@@ -6,9 +6,12 @@ import { ActivityStats } from './components/activity-stats';
 import { RecentLogs } from './components/recent-logs';
 import { SupabaseInstruments } from './components/supabase-instruments';
 
+export type ActivitiesKindTab = 'campaigns' | 'sideQuests';
+
 export default function App() {
   const { quests, logs, addQuest, updateQuest, removeQuest, addLog, deleteLog } =
     useQuestData();
+  const [activitiesKindTab, setActivitiesKindTab] = useState<ActivitiesKindTab>('campaigns');
 
   return (
     <div className="min-h-screen">
@@ -20,7 +23,7 @@ export default function App() {
               Quest Tracker
             </h1>
           </div>
-          <p className="text-background-text">
+          <p className="text-background-text font-heading">
             Life is a game that everyone can win.
           </p>
         </div>
@@ -29,6 +32,8 @@ export default function App() {
           <div className="space-y-6">
             <ActivityManager
               activities={quests}
+              activeTab={activitiesKindTab}
+              onTabChange={setActivitiesKindTab}
               onAddQuest={addQuest}
               onUpdateQuest={updateQuest}
               onRemoveActivity={removeQuest}
@@ -36,10 +41,16 @@ export default function App() {
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <ActivityStats activities={quests} logs={logs} onLogActivity={addLog} />
+            <ActivityStats
+              activities={quests}
+              logs={logs}
+              kindTab={activitiesKindTab}
+              onLogActivity={addLog}
+            />
             <RecentLogs
               activities={quests}
               logs={logs}
+              kindTab={activitiesKindTab}
               onDeleteLog={deleteLog}
             />
             <SupabaseInstruments />

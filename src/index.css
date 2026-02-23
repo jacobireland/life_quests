@@ -79,4 +79,6 @@
 /* Heading font for tabs and titles (outside layer so it overrides inherited body font) */
 .font-heading {
   font-family: "Cinzel", serif !important;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
 }

@@ -7,6 +7,8 @@ import { ArchetypeIcon } from './archetype-icon';
 interface RecentLogsProps {
   activities: Activity[];
   logs: ActivityLog[];
+  /** When 'campaigns', show only campaign logs; when 'sideQuests', show only side quest logs. */
+  kindTab: 'campaigns' | 'sideQuests';
   onDeleteLog: (id: string) => void;
 }
 
@@ -70,21 +72,24 @@ function didLogAchieveCheckpoint(log: ActivityLog, activity: Activity, allLogs: 
   return totalBefore < goal.amount && totalIncluding >= goal.amount;
 }
 
-export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
+export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLogsProps) {
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
   const [viewLogId, setViewLogId] = useState<string | null>(null);
 
+  const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
+
   const sortedLogs = useMemo(() => {
-    return [...logs].sort((a, b) => {
+    const filtered = kindTab === 'campaigns'
+      ? logs.filter((log) => (activityById.get(log.activityId)?.kind ?? 'campaign') === 'campaign')
+      : logs.filter((log) => activityById.get(log.activityId)?.kind === 'sideQuest');
+    return filtered.sort((a, b) => {
       const aT = a.submittedAt ? new Date(a.submittedAt).getTime() : parseLocalDate(a.date).getTime();
       const bT = b.submittedAt ? new Date(b.submittedAt).getTime() : parseLocalDate(b.date).getTime();
       if (bT !== aT) return bT - aT;
       const dateCmp = parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime();
       return dateCmp !== 0 ? dateCmp : b.id.localeCompare(a.id);
     });
-  }, [logs]);
-
-  const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
+  }, [logs, kindTab, activityById]);
 
   const viewLog = viewLogId ? logs.find((l) => l.id === viewLogId) : null;
   const viewActivity = viewLog ? activityById.get(viewLog.activityId) : null;

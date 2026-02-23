@@ -14,12 +14,11 @@ const TAB_LABELS: Record<TimeRangeTab, string> = {
   year: 'Yearly',
 };
 
-const STATS_KIND_TABS = ['campaignObjectives', 'sideQuests'] as const;
-type StatsKindTab = (typeof STATS_KIND_TABS)[number];
-
 interface ActivityStatsProps {
   activities: Activity[];
   logs: ActivityLog[];
+  /** Driven by ActivityManager tab: 'campaigns' → Campaign Objectives, 'sideQuests' → Side Quests */
+  kindTab: 'campaigns' | 'sideQuests';
   onLogActivity: (
     activityId: string,
     hours: number | undefined,
@@ -56,8 +55,7 @@ function formatCompletionDate(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function ActivityStats({ activities, logs, onLogActivity }: ActivityStatsProps) {
-  const [kindTab, setKindTab] = useState<StatsKindTab>('campaignObjectives');
+export function ActivityStats({ activities, logs, kindTab, onLogActivity }: ActivityStatsProps) {
   const [activeTab, setActiveTab] = useState<TimeRangeTab>('week');
   const [logModalActivity, setLogModalActivity] = useState<Activity | null>(null);
   const [viewCompletedActivity, setViewCompletedActivity] = useState<Activity | null>(null);
@@ -67,7 +65,7 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
   const [logNotes, setLogNotes] = useState('');
 
   const displayActivities = useMemo(() => {
-    return kindTab === 'campaignObjectives'
+    return kindTab === 'campaigns'
       ? activities.filter((a) => (a.kind ?? 'campaign') === 'campaign')
       : activities.filter((a) => a.kind === 'sideQuest');
   }, [activities, kindTab]);
@@ -162,33 +160,16 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
 
   return (
     <div className="card">
-      <div className="flex mt-4 mb-6 gap-0.5 pb-0 bg-surface-subtle rounded-t-card border-b border-border border-opacity-60">
-        {STATS_KIND_TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setKindTab(tab)}
-            className={`flex-1 px-4 py-2.5 text-base font-bold font-heading transition-colors rounded-t-md ${
-              kindTab === tab
-                ? 'bg-surface-card text-foreground-text border border-border border-b-0 border-opacity-60 -mb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]'
-                : 'bg-transparent text-foreground-secondary hover:bg-black/5 rounded-b-md'
-            }`}
-          >
-            {tab === 'campaignObjectives' ? 'Campaign Objectives' : 'Side Quests'}
-          </button>
-        ))}
-      </div>
-
-      <h2 className="font-semibold text-foreground-text mt-4 mb-1">
-        {kindTab === 'campaignObjectives' ? 'Campaign Objectives' : 'Side Quests'}
+      <h2 className="text-xl font-semibold text-foreground-text mt-2 mb-1">
+        {kindTab === 'campaigns' ? 'Campaign Objectives' : 'Side Quests'}
       </h2>
       <p className="text-foreground-subtle text-xs opacity-60 mb-4">
-        {kindTab === 'campaignObjectives'
+        {kindTab === 'campaigns'
           ? 'Click on an objective to log progress!'
           : 'Click on a quest to log completion!'}
       </p>
 
-      {kindTab === 'campaignObjectives' && (
+      {kindTab === 'campaigns' && (
         <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
           {TIME_RANGES.map((tab) => (
             <button

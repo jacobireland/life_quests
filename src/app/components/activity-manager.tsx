@@ -16,6 +16,8 @@ type ManagerTab = (typeof MANAGER_TABS)[number];
 
 interface ActivityManagerProps {
   activities: Activity[];
+  activeTab: ManagerTab;
+  onTabChange: (tab: ManagerTab) => void;
   onAddQuest: (data: NewQuestData) => void;
   onUpdateQuest: (id: string, update: Partial<NewQuestData>) => void;
   onRemoveActivity: (id: string) => void;
@@ -23,6 +25,8 @@ interface ActivityManagerProps {
 
 export function ActivityManager({
   activities,
+  activeTab: managerTab,
+  onTabChange: setManagerTab,
   onAddQuest,
   onUpdateQuest,
   onRemoveActivity,
@@ -38,7 +42,6 @@ export function ActivityManager({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [confirmRemoveQuestId, setConfirmRemoveQuestId] = useState<string | null>(null);
-  const [managerTab, setManagerTab] = useState<ManagerTab>('campaigns');
 
   const selectedQuest = selectedQuestId ? activities.find((a) => a.id === selectedQuestId) : null;
   const questToRemove = confirmRemoveQuestId ? activities.find((a) => a.id === confirmRemoveQuestId) : null;
