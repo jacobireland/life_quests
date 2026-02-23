@@ -2,7 +2,7 @@ import React, { useMemo, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
 import { getTodayLocal, parseLocalDate } from '../utils/date';
-import { ArchetypeIcon } from './archetype-icon';
+import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
 
 const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
 type TimeRangeTab = (typeof TIME_RANGES)[number];
@@ -208,14 +208,6 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
     logModalActivity.goals[0]?.unit === 'hours';
 
   const isSideQuest = logModalActivity?.kind === 'sideQuest';
-
-  const logModalHeader =
-    logModalActivity &&
-    (isSideQuest
-      ? `Complete: ${logModalActivity.name}`
-      : isHourlyQuest
-        ? `Log Hours for ${logModalActivity.name}`
-        : `Log Session for ${logModalActivity.name}`);
 
   const handleLogSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -518,7 +510,7 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
         );
       })()}
 
-      {logModalActivity && logModalHeader && (
+      {logModalActivity && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           role="dialog"
@@ -526,14 +518,27 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
           aria-labelledby="log-modal-title"
         >
           <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 id="log-modal-title" className="font-semibold text-foreground-text">
-                {logModalHeader}
-              </h3>
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-border">
+              <div className="min-w-0 flex-1">
+                <div id="log-modal-title" className="flex items-center gap-2 text-sm font-medium text-foreground-secondary">
+                  <ArchetypeIcon
+                    archetype={logModalActivity.archetype ?? 'warrior'}
+                    color={logModalActivity.color}
+                    size={18}
+                  />
+                  <span>
+                    {ACTIVITY_ARCHETYPE_LABELS[logModalActivity.archetype ?? 'warrior']}{' '}
+                    {isSideQuest ? 'Quest' : 'Campaign'}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-foreground-text mt-1 truncate">
+                  {logModalActivity.name}
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={closeLogModal}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
+                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors flex-shrink-0"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Clock, X } from 'lucide-react';
+import { Clock, X } from 'lucide-react';
 import type { Activity, ActivityLog } from '../types';
 import { parseLocalDate } from '../utils/date';
 import { ArchetypeIcon } from './archetype-icon';
@@ -77,51 +77,53 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
             const activity = activities.find((a) => a.id === log.activityId);
             if (!activity) return null;
 
+            const isSideQuest = activity.kind === 'sideQuest';
+
             return (
-              <div
+              <button
                 key={log.id}
-                className="flex items-center justify-between p-3 rounded-card border border-border bg-surface-muted hover:bg-surface-subtle transition-colors"
+                type="button"
+                onClick={() => setViewLogId(log.id)}
+                className={`w-full flex items-center gap-3 p-3 rounded-card text-left transition-colors ${
+                  isSideQuest
+                    ? 'border border-green-200 bg-green-50 hover:bg-green-100'
+                    : 'border border-border bg-surface-muted hover:bg-surface-subtle'
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={() => setViewLogId(log.id)}
-                  className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                >
-                  <ArchetypeIcon
-                    archetype={activity.archetype ?? 'warrior'}
-                    color={activity.color}
-                    size={18}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground-text">
-                      {activity.name}
-                      {log.title?.trim() && (
-                        <span className="font-normal text-foreground-muted"> — {log.title.trim()}</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-foreground-muted">
-                      {formatDate(log.date)}
-                      {log.hours != null && (
-                        <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
-                      )}
-                      {formatLoggedAt(log.submittedAt) && (
-                        <> • {formatLoggedAt(log.submittedAt)}</>
-                      )}
-                    </div>
+                <ArchetypeIcon
+                  archetype={activity.archetype ?? 'warrior'}
+                  color={activity.color}
+                  size={18}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground-text">
+                    {activity.name}
+                    {!isSideQuest && log.title?.trim() && (
+                      <span className="font-normal text-foreground-muted"> — {log.title.trim()}</span>
+                    )}
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConfirmDeleteLogId(log.id);
-                  }}
-                  className="text-destructive hover:text-destructive-hover transition-colors p-2 rounded flex-shrink-0"
-                  aria-label="Delete log"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+                  <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
+                    {isSideQuest ? (
+                      <>Completed on {formatDate(log.date)}</>
+                    ) : (
+                      <>
+                        {formatDate(log.date)}
+                        {log.hours != null && (
+                          <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
+                        )}
+                        {formatLoggedAt(log.submittedAt) && (
+                          <> • {formatLoggedAt(log.submittedAt)}</>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                {isSideQuest && (
+                  <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
+                    Side quest complete
+                  </span>
+                )}
+              </button>
             );
           })}
         </div>
@@ -182,13 +184,23 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border space-y-3">
               <button
                 type="button"
                 onClick={() => setViewLogId(null)}
                 className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewLogId(null);
+                  setConfirmDeleteLogId(viewLog.id);
+                }}
+                className="block w-full text-center text-sm text-destructive hover:text-destructive-hover transition-colors"
+              >
+                delete log
               </button>
             </div>
           </div>
