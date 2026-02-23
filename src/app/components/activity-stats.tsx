@@ -1,7 +1,7 @@
 import React, { useMemo, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
-import { getTodayLocal, parseLocalDate } from '../utils/date';
+import { getPeriodBoundsForDate, getTodayLocal, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
 
 const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
@@ -29,54 +29,14 @@ interface ActivityStatsProps {
   ) => void;
 }
 
-function startOfWeek(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  date.setDate(date.getDate() - day);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function endOfWeek(d: Date): Date {
-  const date = startOfWeek(d);
-  date.setDate(date.getDate() + 6);
-  date.setHours(23, 59, 59, 999);
-  return date;
-}
-
-function getCurrentPeriodBounds(timeRange: TimeRangeTab): { start: Date; end: Date } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-
-  switch (timeRange) {
-    case 'day':
-      return {
-        start: new Date(y, m, d, 0, 0, 0, 0),
-        end: new Date(y, m, d, 23, 59, 59, 999),
-      };
-    case 'week':
-      return {
-        start: startOfWeek(now),
-        end: endOfWeek(now),
-      };
-    case 'month':
-      return {
-        start: new Date(y, m, 1, 0, 0, 0, 0),
-        end: new Date(y, m + 1, 0, 23, 59, 59, 999),
-      };
-    case 'year':
-      return {
-        start: new Date(y, 0, 1, 0, 0, 0, 0),
-        end: new Date(y, 11, 31, 23, 59, 59, 999),
-      };
-    default:
-      return {
-        start: new Date(y, m, d, 0, 0, 0, 0),
-        end: new Date(y, m, d, 23, 59, 59, 999),
-      };
-  }
+function getPeriodLogs(
+  activityId: string,
+  logs: ActivityLog[],
+  bounds: { start: Date; end: Date },
+): ActivityLog[] {
+  return logs.filter(
+    (log) => log.activityId === activityId && isLogDateInPeriod(log.date, bounds.start, bounds.end),
+  );
 }
 
 function formatGoalLabel(goal: QuestGoal): string {
@@ -114,41 +74,26 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
 
   const { completedSideQuests, incompleteSideQuests } = useMemo(() => {
     const sideQuests = activities.filter((a) => a.kind === 'sideQuest');
-    const completed = sideQuests.filter((a) => logs.some((log) => log.activityId === a.id));
-    const incomplete = sideQuests.filter((a) => !logs.some((log) => log.activityId === a.id));
-    return { completedSideQuests: completed, incompleteSideQuests: incomplete };
+    const completedIds = new Set(logs.map((l) => l.activityId));
+    return {
+      completedSideQuests: sideQuests.filter((a) => completedIds.has(a.id)),
+      incompleteSideQuests: sideQuests.filter((a) => !completedIds.has(a.id)),
+    };
   }, [activities, logs]);
 
   const { completed, current } = useMemo(() => {
-    const bounds = getCurrentPeriodBounds(activeTab);
-    const start = bounds.start.getTime();
-    const end = bounds.end.getTime();
-
-    const questsInTab = displayActivities.filter((a) => {
-      const goal = a.goals[0];
-      return goal && goal.timeRange === activeTab;
-    });
-
+    const questsInTab = displayActivities.filter((a) => a.goals[0]?.timeRange === activeTab);
     const completed: Activity[] = [];
     const current: Activity[] = [];
 
     for (const activity of questsInTab) {
       const goal = activity.goals[0]!;
-      const periodLogs = logs.filter((log) => {
-        const logStart = parseLocalDate(log.date).getTime();
-        const logEnd = logStart + 86400000 - 1;
-        return logStart <= end && logEnd >= start && log.activityId === activity.id;
-      });
-
+      const periodLogs = getPeriodLogs(activity.id, logs, getPeriodBoundsForDate(new Date(), activeTab as PeriodTimeRange));
       const logged =
         goal.unit === 'hours'
           ? periodLogs.reduce((sum, log) => sum + (log.hours ?? 0), 0)
           : periodLogs.length;
-      const target = goal.amount;
-      const isCompleted = logged >= target;
-
-      if (isCompleted) completed.push(activity);
-      else current.push(activity);
+      (logged >= goal.amount ? completed : current).push(activity);
     }
 
     return { completed, current };
@@ -156,22 +101,18 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
 
   const getProgress = (activity: Activity): { logged: number; target: number; unit: string; percent: number } => {
     const goal = activity.goals[0]!;
-    const bounds = getCurrentPeriodBounds(activeTab);
-    const start = bounds.start.getTime();
-    const end = bounds.end.getTime();
-    const periodLogs = logs.filter((log) => {
-      const logStart = parseLocalDate(log.date).getTime();
-      const logEnd = logStart + 86400000 - 1;
-      return logStart <= end && logEnd >= start && log.activityId === activity.id;
-    });
+    const periodLogs = getPeriodLogs(activity.id, logs, getPeriodBoundsForDate(new Date(), activeTab as PeriodTimeRange));
     const logged =
       goal.unit === 'hours'
         ? periodLogs.reduce((sum, log) => sum + (log.hours ?? 0), 0)
         : periodLogs.length;
     const target = goal.amount;
-    const percent = target > 0 ? Math.min(100, (logged / target) * 100) : 0;
-    const unit = goal.unit === 'hours' ? 'hrs' : 'sessions';
-    return { logged, target, unit, percent };
+    return {
+      logged,
+      target,
+      unit: goal.unit === 'hours' ? 'hrs' : 'sessions',
+      percent: target > 0 ? Math.min(100, (logged / target) * 100) : 0,
+    };
   };
 
   const openLogModal = (activity: Activity) => {
@@ -186,20 +127,11 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
 
   /** Logs that completed this activity: for campaigns, period logs; for side quests, all logs. Sorted by date desc. */
   const getLogsForCompletedActivity = (activity: Activity): ActivityLog[] => {
-    if (activity.kind === 'sideQuest') {
-      return [...logs].filter((l) => l.activityId === activity.id).sort((a, b) => b.date.localeCompare(a.date));
-    }
-    const bounds = getCurrentPeriodBounds(activeTab);
-    const start = bounds.start.getTime();
-    const end = bounds.end.getTime();
-    return logs
-      .filter((log) => {
-        if (log.activityId !== activity.id) return false;
-        const logStart = parseLocalDate(log.date).getTime();
-        const logEnd = logStart + 86400000 - 1;
-        return logStart <= end && logEnd >= start;
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
+    const list =
+      activity.kind === 'sideQuest'
+        ? logs.filter((l) => l.activityId === activity.id)
+        : getPeriodLogs(activity.id, logs, getPeriodBoundsForDate(new Date(), activeTab as PeriodTimeRange));
+    return [...list].sort((a, b) => b.date.localeCompare(a.date));
   };
 
   const isHourlyQuest =
@@ -208,6 +140,9 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
     logModalActivity.goals[0]?.unit === 'hours';
 
   const isSideQuest = logModalActivity?.kind === 'sideQuest';
+
+  const viewCompletedLogs = viewCompletedActivity ? getLogsForCompletedActivity(viewCompletedActivity) : [];
+  const viewCompletedIsSideQuest = viewCompletedActivity?.kind === 'sideQuest';
 
   const handleLogSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -233,7 +168,7 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
             key={tab}
             type="button"
             onClick={() => setKindTab(tab)}
-            className={`flex-1 px-4 py-2.5 text-base font-bold transition-colors rounded-t-md ${
+            className={`flex-1 px-4 py-2.5 text-base font-bold font-heading transition-colors rounded-t-md ${
               kindTab === tab
                 ? 'bg-surface-card text-foreground-text border border-border border-b-0 border-opacity-60 -mb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]'
                 : 'bg-transparent text-foreground-secondary hover:bg-black/5 rounded-b-md'
@@ -244,9 +179,14 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
         ))}
       </div>
 
-      <h2 className="font-semibold text-foreground-text mt-4 mb-4">
+      <h2 className="font-semibold text-foreground-text mt-4 mb-1">
         {kindTab === 'campaignObjectives' ? 'Campaign Objectives' : 'Side Quests'}
       </h2>
+      <p className="text-foreground-subtle text-xs opacity-60 mb-4">
+        {kindTab === 'campaignObjectives'
+          ? 'Click on an objective to log progress!'
+          : 'Click on a quest to log completion!'}
+      </p>
 
       {kindTab === 'campaignObjectives' && (
         <div className="flex gap-1 p-1 bg-surface-subtle rounded-card mb-6">
@@ -255,7 +195,7 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 px-3 py-2 rounded-md text-sm font-medium font-heading transition-colors ${
                 activeTab === tab
                   ? 'bg-primary text-secondary shadow-sm'
                   : 'text-foreground-secondary hover:bg-neutral-200'
@@ -309,9 +249,8 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
                 <h3 className="text-sm font-semibold text-foreground-secondary mb-2">Completed</h3>
                 <ul className="space-y-1.5">
                   {completedSideQuests.map((activity) => {
-                    const activityLogs = logs.filter((log) => log.activityId === activity.id);
-                    const latestByDate = [...activityLogs].sort((a, b) => b.date.localeCompare(a.date))[0];
-                    const completedOn = latestByDate ? formatCompletionDate(latestByDate.date) : null;
+                    const latestLog = getLogsForCompletedActivity(activity)[0];
+                    const completedOn = latestLog ? formatCompletionDate(latestLog.date) : null;
                     return (
                       <li key={activity.id}>
                         <button
@@ -354,7 +293,6 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
             <section>
               <ul className="space-y-3">
                 {current.map((activity) => {
-                  const goal = activity.goals[0]!;
                   const progress = getProgress(activity);
                   return (
                     <li key={activity.id}>
@@ -435,80 +373,71 @@ export function ActivityStats({ activities, logs, onLogActivity }: ActivityStats
         </div>
       )}
 
-      {viewCompletedActivity && (() => {
-        const completedLogs = getLogsForCompletedActivity(viewCompletedActivity);
-        const isSideQuest = viewCompletedActivity.kind === 'sideQuest';
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="view-completed-title"
-          >
-            <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <h3 id="view-completed-title" className="font-semibold text-foreground-text flex items-center gap-2">
-                  <ArchetypeIcon
-                    archetype={viewCompletedActivity.archetype ?? 'warrior'}
-                    color={viewCompletedActivity.color}
-                    size={20}
-                  />
-                  {viewCompletedActivity.name}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setViewCompletedActivity(null)}
-                  className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-4 overflow-y-auto flex-1">
-                <p className="text-sm text-foreground-secondary mb-3">
-                  {isSideQuest ? 'Completion log' : `${TAB_LABELS[activeTab]} logs that completed this campaign`}
-                </p>
-                {completedLogs.length === 0 ? (
-                  <p className="text-foreground-muted text-sm">No logs to show.</p>
-                ) : (
-                  <ul className="space-y-3">
-                    {completedLogs.map((log) => (
-                      <li
-                        key={log.id}
-                        className="p-3 rounded-card border border-border bg-surface-muted text-sm"
-                      >
-                        <div className="font-medium text-foreground-text mb-1">
-                          {formatCompletionDate(log.date)}
-                          {log.hours != null && (
-                            <span className="text-foreground-muted font-normal ml-1.5">
-                              — {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
-                            </span>
-                          )}
-                        </div>
-                        {log.title?.trim() && (
-                          <div className="text-foreground-text mt-1">{log.title.trim()}</div>
+      {viewCompletedActivity && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="view-completed-title"
+        >
+          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 id="view-completed-title" className="font-semibold text-foreground-text flex items-center gap-2">
+                <ArchetypeIcon
+                  archetype={viewCompletedActivity.archetype ?? 'warrior'}
+                  color={viewCompletedActivity.color}
+                  size={20}
+                />
+                {viewCompletedActivity.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setViewCompletedActivity(null)}
+                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-sm text-foreground-secondary mb-3">
+                {viewCompletedIsSideQuest ? 'Completion log' : `${TAB_LABELS[activeTab]} logs that completed this campaign`}
+              </p>
+              {viewCompletedLogs.length === 0 ? (
+                <p className="text-foreground-muted text-sm">No logs to show.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {viewCompletedLogs.map((log) => (
+                    <li key={log.id} className="p-3 rounded-card border border-border bg-surface-muted text-sm">
+                      <div className="font-medium text-foreground-text mb-1">
+                        {formatCompletionDate(log.date)}
+                        {log.hours != null && (
+                          <span className="text-foreground-muted font-normal ml-1.5">
+                            — {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
+                          </span>
                         )}
-                        {log.notes?.trim() && (
-                          <div className="text-foreground-muted mt-1.5 whitespace-pre-wrap">{log.notes.trim()}</div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="p-4 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => setViewCompletedActivity(null)}
-                  className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+                      </div>
+                      {log.title?.trim() && <div className="text-foreground-text mt-1">{log.title.trim()}</div>}
+                      {log.notes?.trim() && (
+                        <div className="text-foreground-muted mt-1.5 whitespace-pre-wrap">{log.notes.trim()}</div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="p-4 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setViewCompletedActivity(null)}
+                className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {logModalActivity && (
         <div

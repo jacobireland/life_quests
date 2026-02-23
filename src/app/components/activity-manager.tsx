@@ -41,12 +41,13 @@ export function ActivityManager({
   const [managerTab, setManagerTab] = useState<ManagerTab>('campaigns');
 
   const selectedQuest = selectedQuestId ? activities.find((a) => a.id === selectedQuestId) : null;
+  const questToRemove = confirmRemoveQuestId ? activities.find((a) => a.id === confirmRemoveQuestId) : null;
 
-  const { campaigns, sideQuests, displayActivities } = useMemo(() => {
-    const campaigns = activities.filter((a) => (a.kind ?? 'campaign') === 'campaign');
-    const sideQuests = activities.filter((a) => a.kind === 'sideQuest');
-    const displayActivities = managerTab === 'campaigns' ? campaigns : sideQuests;
-    return { campaigns, sideQuests, displayActivities };
+  const displayActivities = useMemo(() => {
+    const list = activities.filter((a) =>
+      managerTab === 'campaigns' ? (a.kind ?? 'campaign') === 'campaign' : a.kind === 'sideQuest',
+    );
+    return list;
   }, [activities, managerTab]);
 
   useEffect(() => {
@@ -106,9 +107,6 @@ export function ActivityManager({
         notes: newQuestNotes.trim() || null,
         archetype: newQuestArchetype,
       });
-      setNewQuestName('');
-      setNewQuestNotes('');
-      setNewQuestArchetype('warrior');
     } else {
       onAddQuest({
         name: newQuestName.trim(),
@@ -119,14 +117,8 @@ export function ActivityManager({
         kind: 'campaign',
         archetype: newQuestArchetype,
       });
-      setNewQuestName('');
-      setNewQuestColor(DEFAULT_COLOR);
-      setNewQuestGoals([{ ...DEFAULT_GOAL }]);
-      setNewQuestStartDate(getTodayLocal());
-      setNewQuestEndDate(null);
-      setNewQuestArchetype('warrior');
     }
-    setAddModalOpen(false);
+    resetAddForm();
   };
 
   const resetAddForm = () => {
@@ -148,7 +140,7 @@ export function ActivityManager({
             key={tab}
             type="button"
             onClick={() => setManagerTab(tab)}
-            className={`flex-1 px-4 py-2.5 text-base font-bold transition-colors rounded-t-md ${
+            className={`flex-1 px-4 py-2.5 text-base font-bold font-heading transition-colors rounded-t-md ${
               managerTab === tab
                 ? 'bg-surface-card text-foreground-text border border-border border-b-0 border-opacity-60 -mb-px shadow-[0_-1px_2px_rgba(0,0,0,0.04)]'
                 : 'bg-transparent text-foreground-secondary hover:bg-black/5 rounded-b-md'
@@ -352,60 +344,33 @@ export function ActivityManager({
                         />
                       </div>
                     </div>
-
-                    <div>
-                      <label htmlFor="new-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
-                        Color
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          id="new-quest-color"
-                          type="color"
-                          value={newQuestColor}
-                          onChange={(e) => setNewQuestColor(e.target.value)}
-                          className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
-                        />
-                        <input
-                          type="text"
-                          value={newQuestColor}
-                          onChange={(e) => {
-                            const v = e.target.value.trim();
-                            if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
-                          }}
-                          className="input-base flex-1 max-w-[8rem] font-mono text-sm"
-                          placeholder="#3b82f6"
-                        />
-                      </div>
-                    </div>
                   </>
                 )}
 
-                {managerTab === 'sideQuests' && (
-                  <div>
-                    <label htmlFor="new-side-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      Color
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        id="new-side-quest-color"
-                        type="color"
-                        value={newQuestColor}
-                        onChange={(e) => setNewQuestColor(e.target.value)}
-                        className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={newQuestColor}
-                        onChange={(e) => {
-                          const v = e.target.value.trim();
-                          if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
-                        }}
-                        className="input-base flex-1 max-w-[8rem] font-mono text-sm"
-                        placeholder="#3b82f6"
-                      />
-                    </div>
+                <div>
+                  <label htmlFor="new-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Color
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="new-quest-color"
+                      type="color"
+                      value={newQuestColor}
+                      onChange={(e) => setNewQuestColor(e.target.value)}
+                      className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={newQuestColor}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
+                      }}
+                      className="input-base flex-1 max-w-[8rem] font-mono text-sm"
+                      placeholder="#3b82f6"
+                    />
                   </div>
-                )}
+                </div>
 
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 btn-primary rounded-card px-4 py-2 font-medium">
@@ -493,47 +458,44 @@ export function ActivityManager({
         </div>
       )}
 
-      {confirmRemoveQuestId && (() => {
-        const quest = displayActivities.find((a) => a.id === confirmRemoveQuestId) ?? activities.find((a) => a.id === confirmRemoveQuestId);
-        return (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-remove-title"
-          >
-            <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
-              <h3 id="confirm-remove-title" className="font-semibold text-foreground-text mb-2">
-                Remove quest?
-              </h3>
-              <p className="text-foreground-muted text-sm mb-4">
-                Are you sure you want to remove <strong className="text-foreground-text">{quest?.name ?? 'this quest'}</strong>? This cannot be undone.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setConfirmRemoveQuestId(null)}
-                  className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onRemoveActivity(confirmRemoveQuestId);
-                    setConfirmRemoveQuestId(null);
-                    setSelectedQuestId(null);
-                    setEditModalOpen(false);
-                  }}
-                  className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
-                >
-                  Remove
-                </button>
-              </div>
+      {confirmRemoveQuestId && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-remove-title"
+        >
+          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
+            <h3 id="confirm-remove-title" className="font-semibold text-foreground-text mb-2">
+              Remove quest?
+            </h3>
+            <p className="text-foreground-muted text-sm mb-4">
+              Are you sure you want to remove <strong className="text-foreground-text">{questToRemove?.name ?? 'this quest'}</strong>? This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveQuestId(null)}
+                className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onRemoveActivity(confirmRemoveQuestId);
+                  setConfirmRemoveQuestId(null);
+                  setSelectedQuestId(null);
+                  setEditModalOpen(false);
+                }}
+                className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
+              >
+                Remove
+              </button>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }
@@ -585,57 +547,19 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
           />
         </div>
         {isSideQuest ? (
-          <>
-            <div>
-              <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-foreground-secondary mb-1">
-                Notes <span className="text-foreground-subtle">(optional)</span>
-              </label>
-              <textarea
-                id="edit-quest-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any details or context..."
-                className="input-base min-h-[80px] resize-y"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label id="edit-side-quest-archetype-label" htmlFor="edit-side-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Archetype
-              </label>
-              <ArchetypeSelect
-                id="edit-side-quest-archetype"
-                value={archetype}
-                onChange={setArchetype}
-                iconColor={color}
-                aria-labelledby="edit-side-quest-archetype-label"
-              />
-            </div>
-            <div>
-              <label htmlFor="edit-side-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Color
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  id="edit-side-quest-color"
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
-                />
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
-                  }}
-                  className="input-base flex-1 max-w-[8rem] font-mono text-sm"
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
-          </>
+          <div>
+            <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-foreground-secondary mb-1">
+              Notes <span className="text-foreground-subtle">(optional)</span>
+            </label>
+            <textarea
+              id="edit-quest-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any details or context..."
+              className="input-base min-h-[80px] resize-y"
+              rows={3}
+            />
+          </div>
         ) : (
           <>
             <div>
@@ -671,42 +595,6 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
                 </select>
               </div>
             </div>
-            <div>
-              <label id="edit-campaign-archetype-label" htmlFor="edit-campaign-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Archetype
-              </label>
-              <ArchetypeSelect
-                id="edit-campaign-archetype"
-                value={archetype}
-                onChange={setArchetype}
-                iconColor={color}
-                aria-labelledby="edit-campaign-archetype-label"
-              />
-            </div>
-            <div>
-              <label htmlFor="edit-campaign-color" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Color
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  id="edit-campaign-color"
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
-                />
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
-                  }}
-                  className="input-base flex-1 max-w-[8rem] font-mono text-sm"
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm font-medium text-foreground-secondary mb-1">Start date</label>
@@ -731,6 +619,42 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             </div>
           </>
         )}
+        <div>
+          <label id="edit-quest-archetype-label" htmlFor="edit-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+            Archetype
+          </label>
+          <ArchetypeSelect
+            id="edit-quest-archetype"
+            value={archetype}
+            onChange={setArchetype}
+            iconColor={color}
+            aria-labelledby="edit-quest-archetype-label"
+          />
+        </div>
+        <div>
+          <label htmlFor="edit-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
+            Color
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              id="edit-quest-color"
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
+            />
+            <input
+              type="text"
+              value={color}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
+              }}
+              className="input-base flex-1 max-w-[8rem] font-mono text-sm"
+              placeholder="#3b82f6"
+            />
+          </div>
+        </div>
         <div className="flex gap-2">
           <button type="submit" className="flex-1 btn-primary rounded-card px-4 py-2 font-medium text-sm">
             Save changes

@@ -55,14 +55,9 @@ export function ArchetypeIcon({ archetype, color, className = '', size = 16 }: A
   );
 }
 
-export const ACTIVITY_ARCHETYPE_LABELS: Record<ActivityArchetype, string> = {
-  warrior: 'Warrior',
-  scholar: 'Scholar',
-  adventurer: 'Adventurer',
-  artisan: 'Artisan',
-  alchemist: 'Alchemist',
-  bard: 'Bard',
-};
+export const ACTIVITY_ARCHETYPE_LABELS: Record<ActivityArchetype, string> = Object.fromEntries(
+  ACTIVITY_ARCHETYPES.map((a) => [a, a.charAt(0).toUpperCase() + a.slice(1)]),
+) as Record<ActivityArchetype, string>;
 
 const DEFAULT_ICON_COLOR = '#6b7280';
 

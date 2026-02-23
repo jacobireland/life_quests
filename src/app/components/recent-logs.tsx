@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Clock, X } from 'lucide-react';
-import type { Activity, ActivityLog } from '../types';
-import { parseLocalDate } from '../utils/date';
+import type { Activity, ActivityLog, QuestGoal } from '../types';
+import { getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ArchetypeIcon } from './archetype-icon';
 
 interface RecentLogsProps {
@@ -10,60 +10,93 @@ interface RecentLogsProps {
   onDeleteLog: (id: string) => void;
 }
 
+function formatLogDate(dateString: string): string {
+  const date = parseLocalDate(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatLoggedAt(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `Logged ${datePart} at ${timePart}`;
+}
+
+function formatDateFull(dateString: string): string {
+  return parseLocalDate(dateString).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** True if this campaign log is the one that pushed period progress to or over the goal (achieved checkpoint). */
+function didLogAchieveCheckpoint(log: ActivityLog, activity: Activity, allLogs: ActivityLog[]): boolean {
+  const goal: QuestGoal | undefined = activity.goals?.[0];
+  if (!goal || (activity.kind ?? 'campaign') !== 'campaign') return false;
+
+  const logDate = parseLocalDate(log.date);
+  const bounds = getPeriodBoundsForDate(logDate, goal.timeRange as PeriodTimeRange);
+
+  const periodLogs = allLogs
+    .filter((l) => l.activityId === activity.id && isLogDateInPeriod(l.date, bounds.start, bounds.end))
+    .sort((a, b) => {
+      const aDate = a.date;
+      const bDate = b.date;
+      if (aDate !== bDate) return aDate.localeCompare(bDate);
+      const aSub = a.submittedAt ?? '';
+      const bSub = b.submittedAt ?? '';
+      if (aSub !== bSub) return aSub.localeCompare(bSub);
+      return a.id.localeCompare(b.id);
+    });
+
+  const idx = periodLogs.findIndex((l) => l.id === log.id);
+  if (idx < 0) return false;
+
+  const contribution = goal.unit === 'hours' ? (log.hours ?? 0) : 1;
+  let totalIncluding = 0;
+  for (let i = 0; i <= idx; i++) {
+    const l = periodLogs[i];
+    totalIncluding += goal.unit === 'hours' ? (l.hours ?? 0) : 1;
+  }
+  const totalBefore = totalIncluding - contribution;
+  return totalBefore < goal.amount && totalIncluding >= goal.amount;
+}
+
 export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<string | null>(null);
   const [viewLogId, setViewLogId] = useState<string | null>(null);
 
-  const sortedLogs = [...logs].sort((a, b) => {
-    const aSubmitted = a.submittedAt ? new Date(a.submittedAt).getTime() : parseLocalDate(a.date).getTime();
-    const bSubmitted = b.submittedAt ? new Date(b.submittedAt).getTime() : parseLocalDate(b.date).getTime();
-    if (bSubmitted !== aSubmitted) return bSubmitted - aSubmitted;
-    const dateCompare = parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime();
-    if (dateCompare !== 0) return dateCompare;
-    return b.id.localeCompare(a.id);
-  });
-
-  const formatDate = (dateString: string) => {
-    const date = parseLocalDate(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const isToday = date.toDateString() === today.toDateString();
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-
-    if (isToday) return 'Today';
-    if (isYesterday) return 'Yesterday';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+  const sortedLogs = useMemo(() => {
+    return [...logs].sort((a, b) => {
+      const aT = a.submittedAt ? new Date(a.submittedAt).getTime() : parseLocalDate(a.date).getTime();
+      const bT = b.submittedAt ? new Date(b.submittedAt).getTime() : parseLocalDate(b.date).getTime();
+      if (bT !== aT) return bT - aT;
+      const dateCmp = parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime();
+      return dateCmp !== 0 ? dateCmp : b.id.localeCompare(a.id);
     });
-  };
+  }, [logs]);
 
-  const formatLoggedAt = (isoString: string | null | undefined) => {
-    if (!isoString) return null;
-    const d = new Date(isoString);
-    const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    return `Logged ${datePart} at ${timePart}`;
-  };
-
-  const formatDateFull = (dateString: string) => {
-    return parseLocalDate(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
 
   const viewLog = viewLogId ? logs.find((l) => l.id === viewLogId) : null;
-  const viewActivity = viewLog ? activities.find((a) => a.id === viewLog.activityId) : null;
+  const viewActivity = viewLog ? activityById.get(viewLog.activityId) : null;
+
+  const deleteLog = confirmDeleteLogId ? logs.find((l) => l.id === confirmDeleteLogId) : null;
+  const deleteActivity = deleteLog ? activityById.get(deleteLog.activityId) : null;
+  const deleteDescription =
+    deleteActivity ? `"${deleteActivity.name}${deleteLog?.title?.trim() ? ` — ${deleteLog.title.trim()}` : ''}"` : 'this log';
 
   return (
     <div className="card">
-      <h2 className="font-semibold text-foreground-text mb-4">Mission Reports</h2>
+      <h2 className="font-semibold text-foreground-text mb-4">Logbook</h2>
 
       {sortedLogs.length === 0 ? (
         <div className="text-center py-12 text-foreground-subtle">
@@ -74,10 +107,11 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {sortedLogs.slice(0, 50).map((log) => {
-            const activity = activities.find((a) => a.id === log.activityId);
+            const activity = activityById.get(log.activityId);
             if (!activity) return null;
 
             const isSideQuest = activity.kind === 'sideQuest';
+            const achievedCheckpoint = !isSideQuest && didLogAchieveCheckpoint(log, activity, logs);
 
             return (
               <button
@@ -104,10 +138,10 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                   </div>
                   <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
                     {isSideQuest ? (
-                      <>Completed on {formatDate(log.date)}</>
+                      <>Completed on {formatLogDate(log.date)}</>
                     ) : (
                       <>
-                        {formatDate(log.date)}
+                        {formatLogDate(log.date)}
                         {log.hours != null && (
                           <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
                         )}
@@ -120,7 +154,12 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 </div>
                 {isSideQuest && (
                   <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
-                    Side quest complete
+                    Completed Side Quest
+                  </span>
+                )}
+                {achievedCheckpoint && (
+                  <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
+                    Achieved Checkpoint
                   </span>
                 )}
               </button>
@@ -166,13 +205,13 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
                 <div className="text-sm font-medium text-foreground-secondary mb-1">Date accomplished</div>
                 <div className="text-foreground-text">{formatDateFull(viewLog.date)}</div>
               </div>
-              {(viewLog.title != null && viewLog.title.trim() !== '') && (
+              {viewLog.title?.trim() && (
                 <div>
                   <div className="text-sm font-medium text-foreground-secondary mb-1">Title</div>
                   <div className="text-foreground-text">{viewLog.title.trim()}</div>
                 </div>
               )}
-              {(viewLog.notes != null && viewLog.notes.trim() !== '') && (
+              {viewLog.notes?.trim() && (
                 <div>
                   <div className="text-sm font-medium text-foreground-secondary mb-1">Notes</div>
                   <div className="text-foreground-text whitespace-pre-wrap">{viewLog.notes.trim()}</div>
@@ -207,49 +246,42 @@ export function RecentLogs({ activities, logs, onDeleteLog }: RecentLogsProps) {
         </div>
       )}
 
-      {confirmDeleteLogId && (() => {
-        const log = logs.find((l) => l.id === confirmDeleteLogId);
-        const activity = log ? activities.find((a) => a.id === log.activityId) : null;
-        const description = activity
-          ? `"${activity.name}${log?.title?.trim() ? ` — ${log.title.trim()}` : ''}"`
-          : 'this log';
-        return (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-delete-log-title"
-          >
-            <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
-              <h3 id="confirm-delete-log-title" className="font-semibold text-foreground-text mb-2">
-                Delete log?
-              </h3>
-              <p className="text-foreground-muted text-sm mb-4">
-                Are you sure you want to delete {description}? This cannot be undone.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteLogId(null)}
-                  className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDeleteLog(confirmDeleteLogId);
-                    setConfirmDeleteLogId(null);
-                  }}
-                  className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
-                >
-                  Delete
-                </button>
-              </div>
+      {confirmDeleteLogId && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-log-title"
+        >
+          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
+            <h3 id="confirm-delete-log-title" className="font-semibold text-foreground-text mb-2">
+              Delete log?
+            </h3>
+            <p className="text-foreground-muted text-sm mb-4">
+              Are you sure you want to delete {deleteDescription}? This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteLogId(null)}
+                className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteLog(confirmDeleteLogId);
+                  setConfirmDeleteLogId(null);
+                }}
+                className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
+              >
+                Delete
+              </button>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }

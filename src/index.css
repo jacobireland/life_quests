@@ -32,7 +32,10 @@
   body {
     background-color: var(--color-background);
     color: var(--color-background-text);
-    font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    font-family: "Lora", serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Cinzel", serif;
   }
 }
 
@@ -71,4 +74,9 @@
     box-shadow: 0 0 0 2px var(--color-primary);
     border-color: var(--color-primary);
   }
+}
+
+/* Heading font for tabs and titles (outside layer so it overrides inherited body font) */
+.font-heading {
+  font-family: "Cinzel", serif !important;
 }

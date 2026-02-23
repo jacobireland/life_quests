@@ -6,6 +6,9 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        heading: ['"Cinzel"', 'serif'],
+      },
       colors: {
         /* Background */
         background: 'var(--color-background)',
