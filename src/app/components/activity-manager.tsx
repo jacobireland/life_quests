@@ -455,11 +455,13 @@ export function ActivityManager({
                   </div>
                   {selectedQuest && (
                     <EditQuestForm
+                      key={selectedQuest.id}
                       quest={selectedQuest}
                       isSideQuest={selectedQuest.kind === 'sideQuest'}
                       onSave={(update) => {
                         onUpdateQuest(selectedQuest.id, update);
                         setSelectedQuestId(null);
+                        setEditModalOpen(false);
                       }}
                       onRemove={() => setConfirmRemoveQuestId(selectedQuest.id)}
                     />
