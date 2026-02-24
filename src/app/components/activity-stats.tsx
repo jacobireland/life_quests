@@ -409,11 +409,11 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
           title={logModalActivity.name}
           contentClassName="space-y-4"
         >
-          <div className="flex items-center gap-2 text-sm text-[#6b5344] mb-4">
+          <div className="flex items-center gap-3 text-base font-medium text-[#5a3210] mb-4">
             <ArchetypeIcon
               archetype={logModalActivity.archetype ?? 'warrior'}
               color={logModalActivity.color}
-              size={18}
+              size={24}
             />
             <span>
               {ACTIVITY_ARCHETYPE_LABELS[logModalActivity.archetype ?? 'warrior']}{' '}
@@ -440,15 +440,15 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
               </div>
             )}
             <div>
-              <label htmlFor="log-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
-                Notes <span className="text-[#6b5344]">(optional)</span>
+              <label htmlFor="log-notes" className="block text-xs text-[#6b5344] mb-1">
+                Notes (optional)
               </label>
               <textarea
                 id="log-notes"
                 value={logNotes}
                 onChange={(e) => setLogNotes(e.target.value)}
-                className={`w-full min-h-[80px] resize-y ${SCROLL_INPUT_CLASS}`}
-                rows={3}
+                className="w-full min-h-[56px] resize-y rounded border border-[#8b5a2b]/25 bg-[#faf0dc]/50 px-3 py-2 text-sm text-[#2c1505] placeholder:text-[#6b5344]/50 focus:border-[#8b5a2b]/50 focus:outline-none focus:ring-1 focus:ring-[#8b5a2b]/30"
+                rows={2}
                 placeholder="Any additional details..."
               />
             </div>
