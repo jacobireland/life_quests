@@ -15,11 +15,15 @@ export function normalizeQuest(raw: Record<string, unknown>): Activity {
         (g): g is QuestGoal =>
           g != null &&
           typeof (g as QuestGoal).amount === 'number' &&
-          ['hours', 'sessions'].includes((g as QuestGoal).unit) &&
-          ['day', 'week', 'month', 'year'].includes((g as QuestGoal).timeRange),
+          ['hours', 'occurrences'].includes((g as QuestGoal).unit) &&
+          ['day', 'week', 'month', 'year'].includes((g as QuestGoal).timeRange as string),
       )
     : [];
-  const goals = allGoals.length > 0 ? [allGoals[0]] : [];
+  const first = allGoals[0];
+  const goals: QuestGoal[] =
+    first != null
+      ? [{ ...first, timeRange: (first.timeRange === 'year' ? 'month' : first.timeRange) as QuestGoal['timeRange'] }]
+      : [];
   const startDate =
     typeof raw.startDate === 'string' && raw.startDate
       ? raw.startDate

@@ -9,7 +9,7 @@ This doc describes how to migrate Life Quests to Supabase while keeping checkpoi
 When you change anything that affects the future Supabase migration, update this file so it stays accurate. In particular:
 
 - **Data model:** New or changed fields on activities, goals, or logs (e.g. in `src/app/types.ts`); new entities or relationships.
-- **Checkpoint / period logic:** Changes to how we decide “achieved checkpoint,” period boundaries (day/week/month/year), or where that logic lives (e.g. `date.ts`, `activity-stats.tsx`, `recent-logs.tsx`).
+- **Checkpoint / period logic:** Changes to how we decide “achieved checkpoint,” period boundaries (day/week/month), or where that logic lives (e.g. `date.ts`, `activity-stats.tsx`, `recent-logs.tsx`).
 - **Queries or loading:** How we fetch, filter, or paginate activities or logs; new client-side caches or APIs that would map to Supabase queries.
 - **References table:** When moving or renaming the files listed in “References in the codebase,” update that table and any in-doc paths.
 
@@ -21,9 +21,9 @@ Add brief notes (and the date if helpful) under a “Changelog / notes” sectio
 
 - **Data:** All activities and logs live in client state (e.g. React state / context). The client filters and sorts in memory.
 - **Checkpoints:** “Is this period’s goal met?” and “Did this log achieve the checkpoint?” are computed in the client:
-  - **Activity stats** (`activity-stats.tsx`): Uses `getPeriodBoundsForDate`, `getPeriodLogs`, and goal amount/unit to decide completed vs current and to show progress (e.g. 2/3 sessions).
+  - **Activity stats** (`activity-stats.tsx`): Uses `getPeriodBoundsForDate`, `getPeriodLogs`, and goal amount/unit to decide completed vs current and to show progress (e.g. 2/3 occurrences).
   - **Logbook** (`recent-logs.tsx`): For each displayed campaign log, `didLogAchieveCheckpoint(log, activity, logs)` determines if that log was the one that pushed period progress to or over the goal; if so, we show “achieved checkpoint” in green.
-- **Period logic:** Single source of truth is `src/app/utils/date.ts`: `getPeriodBoundsForDate(date, timeRange)`, `isLogDateInPeriod(dateString, start, end)`, and `PeriodTimeRange` ('day' | 'week' | 'month' | 'year'). Week is Sunday–Saturday (see `startOfWeek` / `endOfWeek` in `date.ts`).
+- **Period logic:** Single source of truth is `src/app/utils/date.ts`: `getPeriodBoundsForDate(date, timeRange)`, `isLogDateInPeriod(dateString, start, end)`, and `PeriodTimeRange` ('day' | 'week' | 'month'). Week is Sunday–Saturday (see `startOfWeek` / `endOfWeek` in `date.ts`).
 
 ---
 
@@ -56,12 +56,12 @@ Today the client decides “did this log achieve the checkpoint?” by scanning 
 
 Either way, the rule “which log achieved the checkpoint?” lives in one place (DB or backend), and the client only displays it.
 
-**Checkpoint rule to implement (server-side):** For a given log and its activity’s first goal (`amount`, `unit` = hours | sessions, `timeRange` = day | week | month | year):
+**Checkpoint rule to implement (server-side):** For a given log and its activity’s first goal (`amount`, `unit` = hours | occurrences, `timeRange` = day | week | month | year):
 
 1. Compute the period containing the log’s `date` (same rules as `getPeriodBoundsForDate` in `date.ts`).
 2. Consider only logs for that activity in that period, ordered by `date`, then `submitted_at`, then `id`.
-3. Sum progress up to and including this log (sessions = count, hours = sum of `hours`).
-4. Progress *before* this log = total including this log minus this log’s contribution (1 session or `log.hours`).
+3. Sum progress up to and including this log (occurrences = count, hours = sum of `hours`).
+4. Progress *before* this log = total including this log minus this log’s contribution (1 occurrence or `log.hours`).
 5. This log **achieved the checkpoint** iff `progress_before < goal.amount` and `progress_including >= goal.amount`.
 
 Reuse the same period boundaries as in `date.ts` (especially week = Sunday–Saturday) when implementing this in SQL or in a backend service.
@@ -105,9 +105,11 @@ This avoids recalculating progress on every render and scales to many logs.
 | Activity stats: completed/current, progress | `src/app/components/activity-stats.tsx`: `getPeriodLogs`, `getProgress`, useMemo for `completed`/`current` |
 | Logbook: “achieved checkpoint” per log | `src/app/components/recent-logs.tsx`: `didLogAchieveCheckpoint` |
 | Goal shape (amount, unit, timeRange) | `src/app/types.ts`: `QuestGoal`, `Activity`, `ActivityLog` |
+| Log date (single source) | `ActivityLog.submittedAt` (required); no separate “date achieved” field. See `getDateStringFromISO` in `date.ts`. |
 
 ---
 
 ## Changelog / notes
 
-- *(Add dated notes here when you change data model, checkpoint logic, or anything else that affects the migration.)*
+- **2026-02-23:** Removed “Date Achieved” / “Date Accomplished” from logs. `ActivityLog` no longer has a `date` field; `submittedAt` (ISO timestamp) is required and is the single source for all date display and period/checkpoint logic. Log creation no longer accepts a date—timestamp is set at submit time. Legacy logs loaded from storage are normalized via `normalizeLog()` so old `date`-only entries get a derived `submittedAt`. For Supabase, store only `submittedAt` (or equivalent) for log rows.
+- **2026-02-23:** Removed yearly period; goal time ranges are now day/week/month only. Legacy goals with `timeRange: 'year'` are normalized to `'month'` when loading.

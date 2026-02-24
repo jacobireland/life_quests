@@ -25,6 +25,15 @@ export function getTodayLocal(): string {
   return `${y}-${m}-${day}`;
 }
 
+/** YYYY-MM-DD in local time from an ISO timestamp (e.g. log.submittedAt). */
+export function getDateStringFromISO(isoString: string): string {
+  const d = new Date(isoString);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function startOfWeek(d: Date): Date {
   const date = new Date(d);
   date.setDate(date.getDate() - date.getDay());
@@ -39,7 +48,7 @@ function endOfWeek(d: Date): Date {
   return date;
 }
 
-export type PeriodTimeRange = 'day' | 'week' | 'month' | 'year';
+export type PeriodTimeRange = 'day' | 'week' | 'month';
 
 /** True if the given calendar day (dateString YYYY-MM-DD) overlaps the period [start, end]. */
 export function isLogDateInPeriod(dateString: string, start: Date, end: Date): boolean {
@@ -64,11 +73,6 @@ export function getPeriodBoundsForDate(date: Date, timeRange: PeriodTimeRange): 
       return {
         start: new Date(y, m, 1, 0, 0, 0, 0),
         end: new Date(y, m + 1, 0, 23, 59, 59, 999),
-      };
-    case 'year':
-      return {
-        start: new Date(y, 0, 1, 0, 0, 0, 0),
-        end: new Date(y, 11, 31, 23, 59, 59, 999),
       };
     default:
       return {

@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { Activity, ActivityArchetype, ActivityKind, NewQuestData, QuestGoal } from '../types';
 import { ACTIVITY_ARCHETYPES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
 import { getTodayLocal } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon, ArchetypeSelect } from './archetype-icon';
+import { ScrollModal } from './ScrollModal';
 
 const DEFAULT_COLOR = '#000000';
 
 const DEFAULT_GOAL: QuestGoal = { amount: 2, unit: 'hours', timeRange: 'week' };
 
-const TIME_RANGE_ORDER = ['day', 'week', 'month', 'year'] as const;
+const TIME_RANGE_ORDER = ['day', 'week', 'month'] as const;
 
 const MANAGER_TABS = ['campaigns', 'sideQuests'] as const;
 type ManagerTab = (typeof MANAGER_TABS)[number];
@@ -170,7 +171,7 @@ export function ActivityManager({
                 const goal = activity.goals[0];
                 const timeRangeLabel =
                   managerTab === 'campaigns' && goal
-                    ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives', year: 'Yearly Objectives' }[goal.timeRange]
+                    ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives' }[goal.timeRange]
                     : null;
                 return (
                   <button
@@ -218,286 +219,248 @@ export function ActivityManager({
       </div>
 
       {addModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-quest-title"
+        <ScrollModal
+          isOpen
+          onClose={resetAddForm}
+          title={managerTab === 'sideQuests' ? 'Accept a New Quest' : 'Embark on a New Journey'}
+          contentClassName="max-h-[65vh] overflow-y-auto space-y-4"
         >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 id="add-quest-title" className="font-semibold text-foreground-text">
-                {managerTab === 'sideQuests' ? 'New Side Quest' : 'Embark on a New Journey'}
-              </h3>
-              <button
-                type="button"
-                onClick={resetAddForm}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
+          <form onSubmit={handleAddSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="quest-title" className="block text-sm font-medium text-[#5a3210] mb-1">
+                {managerTab === 'sideQuests' ? 'Quest Objective' : 'Title'}
+              </label>
+              <input
+                id="quest-title"
+                type="text"
+                value={newQuestName}
+                onChange={(e) => setNewQuestName(e.target.value)}
+                placeholder={managerTab === 'sideQuests' ? 'Side quest title' : 'Campaign Name'}
+                className="input-base w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                autoFocus
+              />
             </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <form onSubmit={handleAddSubmit} className="space-y-4">
+
+            <div>
+              <label id="new-quest-archetype-label" htmlFor="new-quest-archetype" className="block text-sm font-medium text-[#5a3210] mb-2">
+                Archetype
+              </label>
+              <ArchetypeSelect
+                id="new-quest-archetype"
+                value={newQuestArchetype}
+                onChange={setNewQuestArchetype}
+                iconColor={newQuestColor}
+                aria-labelledby="new-quest-archetype-label"
+                triggerClassName="bg-[#faf0dc] border border-[#8b5a2b]/50"
+                listClassName="border border-[#8b5a2b]/50 bg-[#faf0dc]"
+              />
+            </div>
+
+            {managerTab === 'sideQuests' ? (
+              <div>
+                <label htmlFor="quest-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
+                  Notes <span className="text-[#6b5344]">(optional)</span>
+                </label>
+                <textarea
+                  id="quest-notes"
+                  value={newQuestNotes}
+                  onChange={(e) => setNewQuestNotes(e.target.value)}
+                  placeholder="Any details or context..."
+                  className="w-full min-h-[80px] resize-y rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  rows={3}
+                />
+              </div>
+            ) : (
+              <>
                 <div>
-                  <label htmlFor="quest-title" className="block text-sm font-medium text-foreground-secondary mb-1">
-                    {managerTab === 'sideQuests' ? 'Title' : 'Name'}
+                  <label className="block text-sm font-medium text-[#5a3210] mb-2">
+                    Objective
                   </label>
-                  <input
-                    id="quest-title"
-                    type="text"
-                    value={newQuestName}
-                    onChange={(e) => setNewQuestName(e.target.value)}
-                    placeholder={managerTab === 'sideQuests' ? 'Side quest title' : 'Campaign Name'}
-                    className="input-base"
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label id="new-quest-archetype-label" htmlFor="new-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Archetype
-                  </label>
-                  <ArchetypeSelect
-                    id="new-quest-archetype"
-                    value={newQuestArchetype}
-                    onChange={setNewQuestArchetype}
-                    iconColor={newQuestColor}
-                    aria-labelledby="new-quest-archetype-label"
-                  />
-                </div>
-
-                {managerTab === 'sideQuests' ? (
-                  <div>
-                    <label htmlFor="quest-notes" className="block text-sm font-medium text-foreground-secondary mb-1">
-                      Notes <span className="text-foreground-subtle">(optional)</span>
-                    </label>
-                    <textarea
-                      id="quest-notes"
-                      value={newQuestNotes}
-                      onChange={(e) => setNewQuestNotes(e.target.value)}
-                      placeholder="Any details or context..."
-                      className="input-base min-h-[80px] resize-y"
-                      rows={3}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                        Objectives
-                      </label>
-                      <p className="text-foreground-muted text-xs mb-2">
-                        e.g. 2 hours every week, or 3 sessions per month
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 p-2 rounded-card border border-border bg-surface-muted">
-                        <input
-                          type="number"
-                          min={1}
-                          value={newQuestGoals[0]?.amount ?? DEFAULT_GOAL.amount}
-                          onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                          className="input-base w-16 text-center py-1.5"
-                        />
-                        <select
-                          value={newQuestGoals[0]?.unit ?? DEFAULT_GOAL.unit}
-                          onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                          className="input-base flex-1 min-w-[100px] py-1.5"
-                        >
-                          {QUEST_GOAL_UNITS.map((u) => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
-                        <span className="text-foreground-muted text-sm">per</span>
-                        <select
-                          value={newQuestGoals[0]?.timeRange ?? DEFAULT_GOAL.timeRange}
-                          onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                          className="input-base flex-1 min-w-[100px] py-1.5"
-                        >
-                          {QUEST_GOAL_TIME_RANGES.map((tr) => (
-                            <option key={tr} value={tr}>{tr}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label htmlFor="quest-start" className="block text-sm font-medium text-foreground-secondary mb-1">
-                          Start date
-                        </label>
-                        <input
-                          id="quest-start"
-                          type="date"
-                          value={newQuestStartDate}
-                          onChange={(e) => setNewQuestStartDate(e.target.value)}
-                          className="input-base py-1.5"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="quest-end" className="block text-sm font-medium text-foreground-secondary mb-1">
-                          End date <span className="text-foreground-subtle">(optional)</span>
-                        </label>
-                        <input
-                          id="quest-end"
-                          type="date"
-                          value={newQuestEndDate ?? ''}
-                          onChange={(e) => setNewQuestEndDate(e.target.value || null)}
-                          className="input-base py-1.5"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label htmlFor="new-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Color
-                  </label>
-                  <div className="flex items-center gap-3">
+                  <p className="text-[#6b5344] text-xs mb-2">
+                    e.g. 2 hours every week, or 3 occurrences per month
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
                     <input
-                      id="new-quest-color"
-                      type="color"
-                      value={newQuestColor}
-                      onChange={(e) => setNewQuestColor(e.target.value)}
-                      className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                      type="number"
+                      min={1}
+                      value={newQuestGoals[0]?.amount ?? DEFAULT_GOAL.amount}
+                      onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
+                      className="w-16 text-center py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
                     />
-                    <input
-                      type="text"
-                      value={newQuestColor}
-                      onChange={(e) => {
-                        const v = e.target.value.trim();
-                        if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
-                      }}
-                      className="input-base flex-1 max-w-[8rem] font-mono text-sm"
-                      placeholder="#3b82f6"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button type="submit" className="flex-1 btn-primary rounded-card px-4 py-2 font-medium">
-                    {managerTab === 'sideQuests' ? 'Add Side Quest' : 'Begin Quest'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetAddForm}
-                    className="flex-1 bg-surface-subtle text-foreground-secondary rounded-card px-4 py-2 hover:bg-neutral-200 transition-colors font-medium"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-quests-title"
-        >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 id="edit-quests-title" className="font-semibold text-foreground-text">
-                {managerTab === 'sideQuests' ? 'Edit Side Quest' : 'Edit Campaign'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditModalOpen(false);
-                  setSelectedQuestId(null);
-                }}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              {displayActivities.length === 0 ? (
-                <p className="text-foreground-subtle text-sm">
-                  {managerTab === 'campaigns' ? 'No campaigns yet.' : 'No side quests yet.'}
-                </p>
-              ) : (
-                <>
-                  <div className="mb-4">
-                    <label htmlFor="edit-quest-select" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      {managerTab === 'campaigns' ? 'Campaign' : 'Side Quest'}
-                    </label>
                     <select
-                      id="edit-quest-select"
-                      value={selectedQuestId ?? ''}
-                      onChange={(e) => setSelectedQuestId(e.target.value || null)}
-                      className="input-base"
+                      value={newQuestGoals[0]?.unit ?? DEFAULT_GOAL.unit}
+                      onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
+                      className="flex-1 min-w-[100px] py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
                     >
-                      {displayActivities.map((activity) => (
-                        <option key={activity.id} value={activity.id}>
-                          {activity.name}
-                        </option>
+                      {QUEST_GOAL_UNITS.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                    <span className="text-[#6b5344] text-sm">per</span>
+                    <select
+                      value={newQuestGoals[0]?.timeRange ?? DEFAULT_GOAL.timeRange}
+                      onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
+                      className="flex-1 min-w-[100px] py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                    >
+                      {QUEST_GOAL_TIME_RANGES.map((tr) => (
+                        <option key={tr} value={tr}>{tr}</option>
                       ))}
                     </select>
                   </div>
-                  {selectedQuest && (
-                    <EditQuestForm
-                      key={selectedQuest.id}
-                      quest={selectedQuest}
-                      isSideQuest={selectedQuest.kind === 'sideQuest'}
-                      onSave={(update) => {
-                        onUpdateQuest(selectedQuest.id, update);
-                        setSelectedQuestId(null);
-                        setEditModalOpen(false);
-                      }}
-                      onRemove={() => setConfirmRemoveQuestId(selectedQuest.id)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                </div>
 
-      {confirmRemoveQuestId && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="confirm-remove-title"
-        >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
-            <h3 id="confirm-remove-title" className="font-semibold text-foreground-text mb-2">
-              Remove quest?
-            </h3>
-            <p className="text-foreground-muted text-sm mb-4">
-              Are you sure you want to remove <strong className="text-foreground-text">{questToRemove?.name ?? 'this quest'}</strong>? This cannot be undone.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setConfirmRemoveQuestId(null)}
-                className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
-              >
-                Cancel
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="quest-start" className="block text-sm font-medium text-[#5a3210] mb-1">
+                      Start date
+                    </label>
+                    <input
+                      id="quest-start"
+                      type="date"
+                      value={newQuestStartDate}
+                      onChange={(e) => setNewQuestStartDate(e.target.value)}
+                      className="w-full py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="quest-end" className="block text-sm font-medium text-[#5a3210] mb-1">
+                      End date <span className="text-[#6b5344]">(optional)</span>
+                    </label>
+                    <input
+                      id="quest-end"
+                      type="date"
+                      value={newQuestEndDate ?? ''}
+                      onChange={(e) => setNewQuestEndDate(e.target.value || null)}
+                      className="w-full py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div>
+              <label htmlFor="new-quest-color" className="block text-sm font-medium text-[#5a3210] mb-2">
+                Color
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="new-quest-color"
+                  type="color"
+                  value={newQuestColor}
+                  onChange={(e) => setNewQuestColor(e.target.value)}
+                  className="h-10 w-14 cursor-pointer rounded border border-[#8b5a2b] bg-transparent p-0.5"
+                />
+                <input
+                  type="text"
+                  value={newQuestColor}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
+                  }}
+                  className="flex-1 max-w-[8rem] font-mono text-sm rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  placeholder="#3b82f6"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 rounded px-4 py-2 font-medium bg-[#b8860b] text-white hover:brightness-110 transition-all">
+                {managerTab === 'sideQuests' ? 'Add Side Quest' : 'Begin Quest'}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  onRemoveActivity(confirmRemoveQuestId);
-                  setConfirmRemoveQuestId(null);
-                  setSelectedQuestId(null);
-                  setEditModalOpen(false);
-                }}
-                className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
+                onClick={resetAddForm}
+                className="flex-1 rounded px-4 py-2 font-medium border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </ScrollModal>
+      )}
+
+      {editModalOpen && (
+        <ScrollModal
+          isOpen
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedQuestId(null);
+          }}
+          title={managerTab === 'sideQuests' ? 'Edit Side Quest' : 'Edit Campaign'}
+          contentClassName="max-h-[65vh] overflow-y-auto"
+        >
+          {displayActivities.length === 0 ? (
+            <p className="text-[#6b5344] text-sm">
+              {managerTab === 'campaigns' ? 'No campaigns yet.' : 'No side quests yet.'}
+            </p>
+          ) : (
+            <>
+              <div className="mb-4">
+                <label htmlFor="edit-quest-select" className="block text-sm font-medium text-[#5a3210] mb-2">
+                  {managerTab === 'campaigns' ? 'Campaign' : 'Side Quest'}
+                </label>
+                <select
+                  id="edit-quest-select"
+                  value={selectedQuestId ?? ''}
+                  onChange={(e) => setSelectedQuestId(e.target.value || null)}
+                  className="w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                >
+                  {displayActivities.map((activity) => (
+                    <option key={activity.id} value={activity.id}>
+                      {activity.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedQuest && (
+                <EditQuestForm
+                  key={selectedQuest.id}
+                  quest={selectedQuest}
+                  isSideQuest={selectedQuest.kind === 'sideQuest'}
+                  onSave={(update) => {
+                    onUpdateQuest(selectedQuest.id, update);
+                    setSelectedQuestId(null);
+                    setEditModalOpen(false);
+                  }}
+                  onRemove={() => setConfirmRemoveQuestId(selectedQuest.id)}
+                />
+              )}
+            </>
+          )}
+        </ScrollModal>
+      )}
+
+      {confirmRemoveQuestId && (
+        <ScrollModal
+          isOpen
+          onClose={() => setConfirmRemoveQuestId(null)}
+          title="Remove quest?"
+        >
+          <p className="text-[#6b5344] text-sm mb-4">
+            Are you sure you want to remove <strong className="text-[#2c1505]">{questToRemove?.name ?? 'this quest'}</strong>? This cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmRemoveQuestId(null)}
+              className="px-4 py-2 rounded border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onRemoveActivity(confirmRemoveQuestId);
+                setConfirmRemoveQuestId(null);
+                setSelectedQuestId(null);
+                setEditModalOpen(false);
+              }}
+              className="px-4 py-2 rounded text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
               >
                 Remove
               </button>
             </div>
-          </div>
-        </div>
+        </ScrollModal>
       )}
     </div>
   );
@@ -534,11 +497,14 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
     }
   };
 
+  const inputScroll =
+    'rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]';
+
   return (
-    <div className="mt-4 p-3 rounded-card border border-border bg-surface-subtle space-y-4">
+    <div className="mt-4 p-3 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80 space-y-4">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="edit-quest-title" className="block text-sm font-medium text-foreground-secondary mb-1">
+          <label htmlFor="edit-quest-title" className="block text-sm font-medium text-[#5a3210] mb-1">
             Title
           </label>
           <input
@@ -546,51 +512,51 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="input-base"
+            className={`input-base w-full ${inputScroll}`}
           />
         </div>
         {isSideQuest ? (
           <div>
-            <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-foreground-secondary mb-1">
-              Notes <span className="text-foreground-subtle">(optional)</span>
+            <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
+              Notes <span className="text-[#6b5344]">(optional)</span>
             </label>
             <textarea
               id="edit-quest-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any details or context..."
-              className="input-base min-h-[80px] resize-y"
+              className={`w-full min-h-[80px] resize-y ${inputScroll}`}
               rows={3}
             />
           </div>
         ) : (
           <>
             <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label className="block text-sm font-medium text-[#5a3210] mb-2">
                 Quest goal
               </label>
-              <div className="flex flex-wrap items-center gap-2 p-2 rounded-card border border-border bg-surface-muted">
+              <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
                 <input
                   type="number"
                   min={1}
                   value={goal.amount}
                   onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                  className="input-base w-16 text-center py-1.5"
+                  className={`w-16 text-center py-1.5 ${inputScroll}`}
                 />
                 <select
                   value={goal.unit}
                   onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                  className="input-base flex-1 min-w-[100px] py-1.5"
+                  className={`flex-1 min-w-[100px] py-1.5 ${inputScroll}`}
                 >
                   {QUEST_GOAL_UNITS.map((u) => (
                     <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
-                <span className="text-foreground-muted text-sm">per</span>
+                <span className="text-[#6b5344] text-sm">per</span>
                 <select
                   value={goal.timeRange}
                   onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                  className="input-base flex-1 min-w-[100px] py-1.5"
+                  className={`flex-1 min-w-[100px] py-1.5 ${inputScroll}`}
                 >
                   {QUEST_GOAL_TIME_RANGES.map((tr) => (
                     <option key={tr} value={tr}>{tr}</option>
@@ -600,30 +566,30 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1">Start date</label>
+                <label className="block text-sm font-medium text-[#5a3210] mb-1">Start date</label>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="input-base py-1.5"
+                  className={`w-full py-1.5 ${inputScroll}`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1">
-                  End date <span className="text-foreground-subtle">(optional)</span>
+                <label className="block text-sm font-medium text-[#5a3210] mb-1">
+                  End date <span className="text-[#6b5344]">(optional)</span>
                 </label>
                 <input
                   type="date"
                   value={endDate ?? ''}
                   onChange={(e) => setEndDate(e.target.value || null)}
-                  className="input-base py-1.5"
+                  className={`w-full py-1.5 ${inputScroll}`}
                 />
               </div>
             </div>
           </>
         )}
         <div>
-          <label id="edit-quest-archetype-label" htmlFor="edit-quest-archetype" className="block text-sm font-medium text-foreground-secondary mb-2">
+          <label id="edit-quest-archetype-label" htmlFor="edit-quest-archetype" className="block text-sm font-medium text-[#5a3210] mb-2">
             Archetype
           </label>
           <ArchetypeSelect
@@ -632,10 +598,12 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             onChange={setArchetype}
             iconColor={color}
             aria-labelledby="edit-quest-archetype-label"
+            triggerClassName="bg-[#faf0dc] border border-[#8b5a2b]/50"
+            listClassName="border border-[#8b5a2b]/50 bg-[#faf0dc]"
           />
         </div>
         <div>
-          <label htmlFor="edit-quest-color" className="block text-sm font-medium text-foreground-secondary mb-2">
+          <label htmlFor="edit-quest-color" className="block text-sm font-medium text-[#5a3210] mb-2">
             Color
           </label>
           <div className="flex items-center gap-3">
@@ -644,7 +612,7 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5"
+              className="h-10 w-14 cursor-pointer rounded border border-[#8b5a2b] bg-transparent p-0.5"
             />
             <input
               type="text"
@@ -653,13 +621,13 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
                 const v = e.target.value.trim();
                 if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
               }}
-              className="input-base flex-1 max-w-[8rem] font-mono text-sm"
+              className={`flex-1 max-w-[8rem] font-mono text-sm ${inputScroll}`}
               placeholder="#3b82f6"
             />
           </div>
         </div>
         <div className="flex gap-2">
-          <button type="submit" className="flex-1 btn-primary rounded-card px-4 py-2 font-medium text-sm">
+          <button type="submit" className="flex-1 rounded px-4 py-2 font-medium text-sm bg-[#b8860b] text-white hover:brightness-110 transition-all">
             Save changes
           </button>
         </div>

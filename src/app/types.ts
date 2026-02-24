@@ -1,7 +1,7 @@
-export const QUEST_GOAL_UNITS = ['hours', 'sessions'] as const;
+export const QUEST_GOAL_UNITS = ['hours', 'occurrences'] as const;
 export type QuestGoalUnit = (typeof QUEST_GOAL_UNITS)[number];
 
-export const QUEST_GOAL_TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
+export const QUEST_GOAL_TIME_RANGES = ['day', 'week', 'month'] as const;
 export type QuestGoalTimeRange = (typeof QUEST_GOAL_TIME_RANGES)[number];
 
 export const ACTIVITY_KINDS = ['campaign', 'sideQuest'] as const;
@@ -34,15 +34,14 @@ export interface Activity {
 export interface ActivityLog {
   id: string;
   activityId: string;
-  /** Hours logged; optional for session-type quests */
+  /** Hours logged; optional for occurrence-type quests */
   hours?: number;
-  date: string;
   /** Optional title for this specific log entry */
   title?: string | null;
   /** Optional notes for this log entry */
   notes?: string | null;
-  /** ISO timestamp when the log was submitted */
-  submittedAt?: string | null;
+  /** ISO timestamp when the log was submitted; used for all date display and period logic */
+  submittedAt: string;
 }
 
 /** Data required to create a new quest (id is generated). */

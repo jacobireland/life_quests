@@ -1,17 +1,16 @@
 import React, { useMemo, useState, type FormEvent } from 'react';
-import { X } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
-import { getPeriodBoundsForDate, getTodayLocal, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
+import { ScrollModal } from './ScrollModal';
+import { getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
 
-const TIME_RANGES = ['day', 'week', 'month', 'year'] as const;
+const TIME_RANGES = ['day', 'week', 'month'] as const;
 type TimeRangeTab = (typeof TIME_RANGES)[number];
 
 const TAB_LABELS: Record<TimeRangeTab, string> = {
   day: 'Daily',
   week: 'Weekly',
   month: 'Monthly',
-  year: 'Yearly',
 };
 
 interface ActivityStatsProps {
@@ -22,9 +21,9 @@ interface ActivityStatsProps {
   onLogActivity: (
     activityId: string,
     hours: number | undefined,
-    date: string,
     title?: string | null,
     notes?: string | null,
+    submittedAt?: string,
   ) => void;
 }
 
@@ -34,17 +33,29 @@ function getPeriodLogs(
   bounds: { start: Date; end: Date },
 ): ActivityLog[] {
   return logs.filter(
-    (log) => log.activityId === activityId && isLogDateInPeriod(log.date, bounds.start, bounds.end),
+    (log) => log.activityId === activityId && isLogDateInPeriod(getDateStringFromISO(log.submittedAt), bounds.start, bounds.end),
   );
 }
 
 function formatGoalLabel(goal: QuestGoal): string {
-  const unitLabel = goal.unit === 'hours' ? (goal.amount === 1 ? 'hour' : 'hours') : (goal.amount === 1 ? 'session' : 'sessions');
-  const rangeLabel = goal.timeRange === 'day' ? 'day' : goal.timeRange === 'week' ? 'week' : goal.timeRange === 'month' ? 'month' : 'year';
+  const unitLabel = goal.unit === 'hours' ? (goal.amount === 1 ? 'hour' : 'hours') : (goal.amount === 1 ? 'occurrence' : 'occurrences');
+  const rangeLabel = goal.timeRange === 'day' ? 'day' : goal.timeRange === 'week' ? 'week' : 'month';
   return `${goal.amount} ${unitLabel} / ${rangeLabel}`;
 }
 
-/** Formats the log's date field (Date Accomplished) for "Completed on X" display. */
+/** Format a Date for the timestamp text field (e.g. Feb 23, 2026, 3:45 PM). */
+function formatTimestampForInput(d: Date): string {
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Formats a date string for "Completed on X" / "Logged on X" display. */
 function formatCompletionDate(dateString: string): string {
   const date = parseLocalDate(dateString);
   const today = new Date();
@@ -60,9 +71,9 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
   const [logModalActivity, setLogModalActivity] = useState<Activity | null>(null);
   const [viewCompletedActivity, setViewCompletedActivity] = useState<Activity | null>(null);
   const [logHours, setLogHours] = useState('');
-  const [logDate, setLogDate] = useState(() => getTodayLocal());
   const [logTitle, setLogTitle] = useState('');
   const [logNotes, setLogNotes] = useState('');
+  const [logTimestamp, setLogTimestamp] = useState<Date>(() => new Date());
 
   const displayActivities = useMemo(() => {
     return kindTab === 'campaigns'
@@ -108,7 +119,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
     return {
       logged,
       target,
-      unit: goal.unit === 'hours' ? 'hrs' : 'sessions',
+      unit: goal.unit === 'hours' ? 'hrs' : 'occurrences',
       percent: target > 0 ? Math.min(100, (logged / target) * 100) : 0,
     };
   };
@@ -116,9 +127,9 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
   const openLogModal = (activity: Activity) => {
     setLogModalActivity(activity);
     setLogHours('');
-    setLogDate(getTodayLocal());
     setLogTitle('');
     setLogNotes('');
+    setLogTimestamp(new Date());
   };
 
   const closeLogModal = () => setLogModalActivity(null);
@@ -129,7 +140,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
       activity.kind === 'sideQuest'
         ? logs.filter((l) => l.activityId === activity.id)
         : getPeriodLogs(activity.id, logs, getPeriodBoundsForDate(new Date(), activeTab as PeriodTimeRange));
-    return [...list].sort((a, b) => b.date.localeCompare(a.date));
+    return [...list].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
   };
 
   const isHourlyQuest =
@@ -145,15 +156,14 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
   const handleLogSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!logModalActivity) return;
-    const date = logDate || getTodayLocal();
     if (isHourlyQuest && !logHours.trim()) return;
     const hoursVal = isHourlyQuest && logHours.trim() ? parseFloat(logHours) : undefined;
     onLogActivity(
       logModalActivity.id,
       hoursVal,
-      date,
       logTitle.trim() || null,
       logNotes.trim() || null,
+      logTimestamp.toISOString(),
     );
     closeLogModal();
   };
@@ -231,7 +241,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                 <ul className="space-y-1.5">
                   {completedSideQuests.map((activity) => {
                     const latestLog = getLogsForCompletedActivity(activity)[0];
-                    const completedOn = latestLog ? formatCompletionDate(latestLog.date) : null;
+                    const completedOn = latestLog ? formatCompletionDate(getDateStringFromISO(latestLog.submittedAt)) : null;
                     return (
                       <li key={activity.id}>
                         <button
@@ -355,178 +365,134 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
       )}
 
       {viewCompletedActivity && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="view-completed-title"
+        <ScrollModal
+          isOpen
+          onClose={() => setViewCompletedActivity(null)}
+          title={viewCompletedActivity.name}
+          contentClassName="max-h-[60vh] overflow-y-auto"
         >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 id="view-completed-title" className="font-semibold text-foreground-text flex items-center gap-2">
-                <ArchetypeIcon
-                  archetype={viewCompletedActivity.archetype ?? 'warrior'}
-                  color={viewCompletedActivity.color}
-                  size={20}
-                />
-                {viewCompletedActivity.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setViewCompletedActivity(null)}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <p className="text-sm text-foreground-secondary mb-3">
-                {viewCompletedIsSideQuest ? 'Completion log' : `${TAB_LABELS[activeTab]} logs that completed this campaign`}
-              </p>
-              {viewCompletedLogs.length === 0 ? (
-                <p className="text-foreground-muted text-sm">No logs to show.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {viewCompletedLogs.map((log) => (
-                    <li key={log.id} className="p-3 rounded-card border border-border bg-surface-muted text-sm">
-                      <div className="font-medium text-foreground-text mb-1">
-                        {formatCompletionDate(log.date)}
-                        {log.hours != null && (
-                          <span className="text-foreground-muted font-normal ml-1.5">
-                            — {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
-                          </span>
-                        )}
-                      </div>
-                      {log.title?.trim() && <div className="text-foreground-text mt-1">{log.title.trim()}</div>}
-                      {log.notes?.trim() && (
-                        <div className="text-foreground-muted mt-1.5 whitespace-pre-wrap">{log.notes.trim()}</div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="p-4 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setViewCompletedActivity(null)}
-                className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
-              >
-                Close
-              </button>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <ArchetypeIcon
+              archetype={viewCompletedActivity.archetype ?? 'warrior'}
+              color={viewCompletedActivity.color}
+              size={18}
+            />
+            <span className="text-sm text-[#6b5344]">
+              {viewCompletedIsSideQuest ? 'Completion log' : `${TAB_LABELS[activeTab]} logs that completed this campaign`}
+            </span>
           </div>
-        </div>
+          {viewCompletedLogs.length === 0 ? (
+            <p className="text-[#6b5344] text-sm">No logs to show.</p>
+          ) : (
+            <ul className="space-y-3">
+              {viewCompletedLogs.map((log) => (
+                <li key={log.id} className="p-3 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80 text-sm">
+                  <div className="font-medium text-[#2c1505] mb-1">
+                    {formatCompletionDate(getDateStringFromISO(log.submittedAt))}
+                    {log.hours != null && (
+                      <span className="text-[#6b5344] font-normal ml-1.5">
+                        — {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
+                      </span>
+                    )}
+                  </div>
+                  {log.title?.trim() && <div className="text-[#2c1505] mt-1">{log.title.trim()}</div>}
+                  {log.notes?.trim() && (
+                    <div className="text-[#6b5344] mt-1.5 whitespace-pre-wrap">{log.notes.trim()}</div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() => setViewCompletedActivity(null)}
+            className="w-full mt-6 rounded px-4 py-2 font-medium text-sm border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors"
+          >
+            Close
+          </button>
+        </ScrollModal>
       )}
 
       {logModalActivity && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="log-modal-title"
+        <ScrollModal
+          isOpen
+          onClose={closeLogModal}
+          title={logModalActivity.name}
+          contentClassName="space-y-4"
         >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md">
-            <div className="flex items-start justify-between gap-3 p-4 border-b border-border">
-              <div className="min-w-0 flex-1">
-                <div id="log-modal-title" className="flex items-center gap-2 text-sm font-medium text-foreground-secondary">
-                  <ArchetypeIcon
-                    archetype={logModalActivity.archetype ?? 'warrior'}
-                    color={logModalActivity.color}
-                    size={18}
-                  />
-                  <span>
-                    {ACTIVITY_ARCHETYPE_LABELS[logModalActivity.archetype ?? 'warrior']}{' '}
-                    {isSideQuest ? 'Quest' : 'Campaign'}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-foreground-text mt-1 truncate">
-                  {logModalActivity.name}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={closeLogModal}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors flex-shrink-0"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleLogSubmit} className="p-4 space-y-4">
-              {isHourlyQuest && (
-                <div>
-                  <label htmlFor="log-hours" className="block text-sm font-medium text-foreground-secondary mb-1">
-                    Hours Spent
-                  </label>
-                  <input
-                    id="log-hours"
-                    type="number"
-                    step="0.25"
-                    min="0.25"
-                    value={logHours}
-                    onChange={(e) => setLogHours(e.target.value)}
-                    className="input-base"
-                    placeholder="e.g., 2.5"
-                    required
-                  />
-                </div>
-              )}
+          <div className="flex items-center gap-2 text-sm text-[#6b5344] mb-4">
+            <ArchetypeIcon
+              archetype={logModalActivity.archetype ?? 'warrior'}
+              color={logModalActivity.color}
+              size={18}
+            />
+            <span>
+              {ACTIVITY_ARCHETYPE_LABELS[logModalActivity.archetype ?? 'warrior']}{' '}
+              {isSideQuest ? 'Quest' : 'Campaign'}
+            </span>
+          </div>
+          <form onSubmit={handleLogSubmit} className="space-y-4">
+            {isHourlyQuest && (
               <div>
-                <label htmlFor="log-date" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Date Accomplished
+                <label htmlFor="log-hours" className="block text-sm font-medium text-[#5a3210] mb-1">
+                  Hours Spent
                 </label>
                 <input
-                  id="log-date"
-                  type="date"
-                  value={logDate}
-                  onChange={(e) => setLogDate(e.target.value)}
-                  className="input-base"
+                  id="log-hours"
+                  type="number"
+                  step="0.25"
+                  min="0.25"
+                  value={logHours}
+                  onChange={(e) => setLogHours(e.target.value)}
+                  className="input-base w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  placeholder="e.g., 2.5"
                   required
                 />
               </div>
-              <div>
-                <label htmlFor="log-title" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Title <span className="text-foreground-subtle">(optional)</span>
-                </label>
-                <input
-                  id="log-title"
-                  type="text"
-                  value={logTitle}
-                  onChange={(e) => setLogTitle(e.target.value)}
-                  className="input-base"
-                  placeholder="e.g., Morning run, Chapter 5"
-                />
-              </div>
-              <div>
-                <label htmlFor="log-notes" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Notes <span className="text-foreground-subtle">(optional)</span>
-                </label>
-                <textarea
-                  id="log-notes"
-                  value={logNotes}
-                  onChange={(e) => setLogNotes(e.target.value)}
-                  className="input-base min-h-[80px] resize-y"
-                  rows={3}
-                  placeholder="Any additional details..."
-                />
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" className="flex-1 btn-primary rounded-card px-4 py-2 font-medium text-sm">
-                  {isSideQuest ? 'Complete' : 'Log'}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeLogModal}
-                  className="flex-1 rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            )}
+            <div>
+              <label htmlFor="log-title" className="block text-sm font-medium text-[#5a3210] mb-1">
+                Title <span className="text-[#6b5344]">(optional)</span>
+              </label>
+              <input
+                id="log-title"
+                type="text"
+                value={logTitle}
+                onChange={(e) => setLogTitle(e.target.value)}
+                className="input-base w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                placeholder="e.g., Morning run, Chapter 5"
+              />
+            </div>
+            <div>
+              <label htmlFor="log-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
+                Notes <span className="text-[#6b5344]">(optional)</span>
+              </label>
+              <textarea
+                id="log-notes"
+                value={logNotes}
+                onChange={(e) => setLogNotes(e.target.value)}
+                className="w-full min-h-[80px] resize-y rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                rows={3}
+                placeholder="Any additional details..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 rounded px-4 py-2 font-medium text-sm bg-[#b8860b] text-white hover:brightness-110 transition-all">
+                {isSideQuest ? 'Complete' : 'Log'}
+              </button>
+              <button
+                type="button"
+                onClick={closeLogModal}
+                className="flex-1 rounded px-4 py-2 font-medium text-sm border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-xs text-[#6b5344] mt-3 pt-3 border-t border-[#8b5a2b]/20">
+              Timestamp: {formatTimestampForInput(logTimestamp)}
+            </p>
+          </form>
+        </ScrollModal>
       )}
     </div>
   );

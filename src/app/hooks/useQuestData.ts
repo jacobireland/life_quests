@@ -2,7 +2,26 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Activity, ActivityLog, NewQuestData, QuestUpdate } from '../types';
 import { STORAGE_KEYS } from '../data/constants';
 import { normalizeQuest } from '../data/normalizeQuest';
-import { getTodayLocal } from '../utils/date';
+import { getDateStringFromISO, getTodayLocal, parseLocalDate } from '../utils/date';
+
+/** Normalize legacy logs that had date instead of submittedAt. */
+function normalizeLog(raw: Record<string, unknown>): ActivityLog {
+  const submittedAt = raw.submittedAt != null
+    ? String(raw.submittedAt)
+    : (() => {
+        const dateStr = raw.date != null ? String(raw.date) : getTodayLocal();
+        const d = parseLocalDate(dateStr);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0).toISOString();
+      })();
+  return {
+    id: String(raw.id),
+    activityId: String(raw.activityId),
+    ...(raw.hours != null ? { hours: Number(raw.hours) } : {}),
+    ...(raw.title != null && raw.title !== '' ? { title: String(raw.title) } : {}),
+    ...(raw.notes != null && raw.notes !== '' ? { notes: String(raw.notes) } : {}),
+    submittedAt,
+  };
+}
 
 const DEFAULT_QUESTS: Activity[] = [
   { id: '1', name: 'Exercise', color: '#10b981', goals: [], startDate: getTodayLocal(), endDate: null },
@@ -35,7 +54,13 @@ export function useQuestData() {
   const [logs, setLogs] = useState<ActivityLog[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.questLogs);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const today = getTodayLocal();
+      return parsed
+        .map((log) => normalizeLog(log as Record<string, unknown>))
+        .filter((log) => getDateStringFromISO(log.submittedAt) >= today);
     } catch {
       return [];
     }
@@ -80,9 +105,9 @@ export function useQuestData() {
     (
       questId: string,
       hours: number | undefined,
-      date: string,
       title?: string | null,
       notes?: string | null,
+      submittedAt?: string,
     ) => {
       setLogs((prev) => [
         ...prev,
@@ -90,8 +115,7 @@ export function useQuestData() {
           id: crypto.randomUUID?.() ?? Date.now().toString(),
           activityId: questId,
           ...(hours != null ? { hours } : {}),
-          date,
-          submittedAt: new Date().toISOString(),
+          submittedAt: submittedAt ?? new Date().toISOString(),
           ...(title != null && title !== '' ? { title } : {}),
           ...(notes != null && notes !== '' ? { notes } : {}),
         },

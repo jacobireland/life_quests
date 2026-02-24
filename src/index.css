@@ -23,11 +23,13 @@
 
   /* Radius */
   --radius-card: 0.5rem;
+
 }
 
 @layer base {
   html {
     @apply antialiased;
+    scrollbar-gutter: stable;
   }
   body {
     background-color: var(--color-background);
@@ -74,6 +76,7 @@
     box-shadow: 0 0 0 2px var(--color-primary);
     border-color: var(--color-primary);
   }
+
 }
 
 /* Heading font for tabs and titles (outside layer so it overrides inherited body font) */

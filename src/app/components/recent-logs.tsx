@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Clock, X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
-import { getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
+import { getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ArchetypeIcon } from './archetype-icon';
+import { ScrollModal } from './ScrollModal';
 
 interface RecentLogsProps {
   activities: Activity[];
@@ -30,13 +31,27 @@ function formatLoggedAt(isoString: string | null | undefined): string | null {
   return `Logged ${datePart} at ${timePart}`;
 }
 
-function formatDateFull(dateString: string): string {
-  return parseLocalDate(dateString).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+/** Date only (YYYY-MM-DD) for grouping by "logged at" day. */
+function getLoggedAtDateKey(log: ActivityLog): string {
+  return getDateStringFromISO(log.submittedAt);
+}
+
+/** Section header: "Feb 23, 2026" (or "Today" / "Yesterday"). */
+function formatSectionDate(dateKey: string): string {
+  const date = parseLocalDate(dateKey);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Time only for use under a date header: "3:45 PM". */
+function formatLoggedTime(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 /** True if this campaign log is the one that pushed period progress to or over the goal (achieved checkpoint). */
@@ -44,17 +59,14 @@ function didLogAchieveCheckpoint(log: ActivityLog, activity: Activity, allLogs: 
   const goal: QuestGoal | undefined = activity.goals?.[0];
   if (!goal || (activity.kind ?? 'campaign') !== 'campaign') return false;
 
-  const logDate = parseLocalDate(log.date);
+  const logDate = parseLocalDate(getDateStringFromISO(log.submittedAt));
   const bounds = getPeriodBoundsForDate(logDate, goal.timeRange as PeriodTimeRange);
 
   const periodLogs = allLogs
-    .filter((l) => l.activityId === activity.id && isLogDateInPeriod(l.date, bounds.start, bounds.end))
+    .filter((l) => l.activityId === activity.id && isLogDateInPeriod(getDateStringFromISO(l.submittedAt), bounds.start, bounds.end))
     .sort((a, b) => {
-      const aDate = a.date;
-      const bDate = b.date;
-      if (aDate !== bDate) return aDate.localeCompare(bDate);
-      const aSub = a.submittedAt ?? '';
-      const bSub = b.submittedAt ?? '';
+      const aSub = a.submittedAt;
+      const bSub = b.submittedAt;
       if (aSub !== bSub) return aSub.localeCompare(bSub);
       return a.id.localeCompare(b.id);
     });
@@ -79,17 +91,29 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
   const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
 
   const sortedLogs = useMemo(() => {
-    const filtered = kindTab === 'campaigns'
+    const byKind = kindTab === 'campaigns'
       ? logs.filter((log) => (activityById.get(log.activityId)?.kind ?? 'campaign') === 'campaign')
       : logs.filter((log) => activityById.get(log.activityId)?.kind === 'sideQuest');
-    return filtered.sort((a, b) => {
-      const aT = a.submittedAt ? new Date(a.submittedAt).getTime() : parseLocalDate(a.date).getTime();
-      const bT = b.submittedAt ? new Date(b.submittedAt).getTime() : parseLocalDate(b.date).getTime();
+    const withActivity = byKind.filter((log) => activityById.has(log.activityId));
+    return withActivity.sort((a, b) => {
+      const aT = new Date(a.submittedAt).getTime();
+      const bT = new Date(b.submittedAt).getTime();
       if (bT !== aT) return bT - aT;
-      const dateCmp = parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime();
-      return dateCmp !== 0 ? dateCmp : b.id.localeCompare(a.id);
+      return b.id.localeCompare(a.id);
     });
   }, [logs, kindTab, activityById]);
+
+  /** Logs grouped by logged-at date (desc), for section headers. */
+  const logsByDate = useMemo(() => {
+    const map = new Map<string, ActivityLog[]>();
+    for (const log of sortedLogs) {
+      const key = getLoggedAtDateKey(log);
+      const list = map.get(key) ?? [];
+      list.push(log);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => b.localeCompare(a));
+  }, [sortedLogs]);
 
   const viewLog = viewLogId ? logs.find((l) => l.id === viewLogId) : null;
   const viewActivity = viewLog ? activityById.get(viewLog.activityId) : null;
@@ -106,186 +130,175 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
       {sortedLogs.length === 0 ? (
         <div className="text-center py-12 text-foreground-subtle">
           <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p className="font-medium">No quest logs yet</p>
-          <p className="text-sm mt-1">Start by logging your first quest</p>
+          <p className="font-medium">
+            {kindTab === 'campaigns' ? 'No campaign logs yet' : 'No side quest logs yet'}
+          </p>
+          <p className="text-sm mt-1">
+            {kindTab === 'campaigns'
+              ? 'Start by logging your first campaign'
+              : 'Start by logging your first side quest'}
+          </p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {sortedLogs.slice(0, 50).map((log) => {
-            const activity = activityById.get(log.activityId);
-            if (!activity) return null;
+        <div className="space-y-4 max-h-96 overflow-y-auto min-w-0 px-1">
+          {logsByDate.map(([dateKey, groupLogs]) => (
+            <section key={dateKey} className="space-y-2 min-w-0">
+              <h3 className="text-xs font-medium text-foreground-muted uppercase tracking-wide sticky top-0 z-10 bg-surface-card py-1 pr-2">
+                {formatSectionDate(dateKey)}
+              </h3>
+              {groupLogs.map((log) => {
+                const activity = activityById.get(log.activityId);
+                if (!activity) return null;
 
-            const isSideQuest = activity.kind === 'sideQuest';
-            const achievedCheckpoint = !isSideQuest && didLogAchieveCheckpoint(log, activity, logs);
+                const isSideQuest = activity.kind === 'sideQuest';
+                const achievedCheckpoint = !isSideQuest && didLogAchieveCheckpoint(log, activity, logs);
+                const loggedTime = formatLoggedTime(log.submittedAt);
 
-            return (
-              <button
-                key={log.id}
-                type="button"
-                onClick={() => setViewLogId(log.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-card text-left transition-colors ${
-                  isSideQuest
-                    ? 'border border-green-200 bg-green-50 hover:bg-green-100'
-                    : 'border border-border bg-surface-muted hover:bg-surface-subtle'
-                }`}
-              >
-                <ArchetypeIcon
-                  archetype={activity.archetype ?? 'warrior'}
-                  color={activity.color}
-                  size={18}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-foreground-text">
-                    {activity.name}
-                    {!isSideQuest && log.title?.trim() && (
-                      <span className="font-normal text-foreground-muted"> — {log.title.trim()}</span>
-                    )}
-                  </div>
-                  <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
-                    {isSideQuest ? (
-                      <>Completed on {formatLogDate(log.date)}</>
-                    ) : (
-                      <>
-                        {formatLogDate(log.date)}
-                        {log.hours != null && (
-                          <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
+                return (
+                  <button
+                    key={log.id}
+                    type="button"
+                    onClick={() => setViewLogId(log.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-card text-left transition-colors ${
+                      isSideQuest
+                        ? 'border border-green-200 bg-green-50 hover:bg-green-100'
+                        : 'border border-border bg-surface-muted hover:bg-surface-subtle'
+                    }`}
+                  >
+                    <ArchetypeIcon
+                      archetype={activity.archetype ?? 'warrior'}
+                      color={activity.color}
+                      size={18}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground-text">
+                        {activity.name}
+                        {!isSideQuest && log.title?.trim() && (
+                          <span className="font-normal text-foreground-muted"> — {log.title.trim()}</span>
                         )}
-                        {formatLoggedAt(log.submittedAt) && (
-                          <> • {formatLoggedAt(log.submittedAt)}</>
+                      </div>
+                      <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
+                        {isSideQuest ? (
+                          <>Completed on {formatLogDate(getDateStringFromISO(log.submittedAt))}</>
+                        ) : (
+                          <>
+                            {formatLogDate(getDateStringFromISO(log.submittedAt))}
+                            {log.hours != null && (
+                              <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
+                            )}
+                            {loggedTime && (
+                              <> • {loggedTime}</>
+                            )}
+                          </>
                         )}
-                      </>
+                      </div>
+                    </div>
+                    {isSideQuest && (
+                      <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
+                        Completed Side Quest
+                      </span>
                     )}
-                  </div>
-                </div>
-                {isSideQuest && (
-                  <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
-                    Completed Side Quest
-                  </span>
-                )}
-                {achievedCheckpoint && (
-                  <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
-                    Achieved Checkpoint
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                    {achievedCheckpoint && (
+                      <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
+                        Achieved Checkpoint
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </section>
+          ))}
         </div>
       )}
 
       {viewLog && viewActivity && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="view-log-title"
+        <ScrollModal
+          isOpen
+          onClose={() => setViewLogId(null)}
+          title={viewActivity.name}
+          contentClassName="space-y-4"
         >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-md max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 id="view-log-title" className="font-semibold text-foreground-text flex items-center gap-2">
-                <ArchetypeIcon
-                  archetype={viewActivity.archetype ?? 'warrior'}
-                  color={viewActivity.color}
-                  size={20}
-                />
-                {viewActivity.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setViewLogId(null)}
-                className="p-1.5 rounded text-foreground-muted hover:bg-surface-subtle hover:text-foreground-text transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto space-y-4">
-              {viewLog.hours != null && (
-                <div>
-                  <div className="text-sm font-medium text-foreground-secondary mb-1">Hours spent</div>
-                  <div className="text-foreground-text">{viewLog.hours} {viewLog.hours === 1 ? 'hour' : 'hours'}</div>
-                </div>
-              )}
-              <div>
-                <div className="text-sm font-medium text-foreground-secondary mb-1">Date accomplished</div>
-                <div className="text-foreground-text">{formatDateFull(viewLog.date)}</div>
-              </div>
-              {viewLog.title?.trim() && (
-                <div>
-                  <div className="text-sm font-medium text-foreground-secondary mb-1">Title</div>
-                  <div className="text-foreground-text">{viewLog.title.trim()}</div>
-                </div>
-              )}
-              {viewLog.notes?.trim() && (
-                <div>
-                  <div className="text-sm font-medium text-foreground-secondary mb-1">Notes</div>
-                  <div className="text-foreground-text whitespace-pre-wrap">{viewLog.notes.trim()}</div>
-                </div>
-              )}
-              {viewLog.submittedAt && (
-                <div className="pt-2 border-t border-border">
-                  <div className="text-sm text-foreground-muted">{formatLoggedAt(viewLog.submittedAt)}</div>
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-border space-y-3">
-              <button
-                type="button"
-                onClick={() => setViewLogId(null)}
-                className="w-full rounded-card px-4 py-2 font-medium text-sm border border-border bg-surface-muted text-foreground-text hover:bg-surface-subtle transition-colors"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewLogId(null);
-                  setConfirmDeleteLogId(viewLog.id);
-                }}
-                className="block w-full text-center text-sm text-destructive hover:text-destructive-hover transition-colors"
-              >
-                delete log
-              </button>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <ArchetypeIcon
+              archetype={viewActivity.archetype ?? 'warrior'}
+              color={viewActivity.color}
+              size={20}
+            />
+            <span className="text-sm font-medium text-[#5a3210]">Log entry</span>
           </div>
-        </div>
+          {viewLog.hours != null && (
+            <div>
+              <div className="text-sm font-medium text-[#6b5344] mb-1">Hours spent</div>
+              <div className="text-[#2c1505]">{viewLog.hours} {viewLog.hours === 1 ? 'hour' : 'hours'}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-medium text-[#6b5344] mb-1">Logged</div>
+            <div className="text-[#2c1505]">{formatLoggedAt(viewLog.submittedAt)}</div>
+          </div>
+          {viewLog.title?.trim() && (
+            <div>
+              <div className="text-sm font-medium text-[#6b5344] mb-1">Title</div>
+              <div className="text-[#2c1505]">{viewLog.title.trim()}</div>
+            </div>
+          )}
+          {viewLog.notes?.trim() && (
+            <div>
+              <div className="text-sm font-medium text-[#6b5344] mb-1">Notes</div>
+              <div className="text-[#2c1505] whitespace-pre-wrap">{viewLog.notes.trim()}</div>
+            </div>
+          )}
+          <div className="flex flex-col gap-2 mt-6 pt-4 border-t border-[#8b5a2b]/40">
+            <button
+              type="button"
+              onClick={() => setViewLogId(null)}
+              className="w-full rounded px-4 py-2 font-medium text-sm border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewLogId(null);
+                setConfirmDeleteLogId(viewLog.id);
+              }}
+              className="block w-full text-center text-sm text-red-700 hover:text-red-800 transition-colors"
+            >
+              delete log
+            </button>
+          </div>
+        </ScrollModal>
       )}
 
       {confirmDeleteLogId && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="confirm-delete-log-title"
+        <ScrollModal
+          isOpen
+          onClose={() => setConfirmDeleteLogId(null)}
+          title="Delete log?"
         >
-          <div className="bg-surface-card rounded-card shadow-lg border border-border w-full max-w-sm p-4">
-            <h3 id="confirm-delete-log-title" className="font-semibold text-foreground-text mb-2">
-              Delete log?
-            </h3>
-            <p className="text-foreground-muted text-sm mb-4">
-              Are you sure you want to delete {deleteDescription}? This cannot be undone.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteLogId(null)}
-                className="px-4 py-2 rounded-card text-foreground-secondary bg-surface-subtle hover:bg-neutral-200 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteLog(confirmDeleteLogId);
-                  setConfirmDeleteLogId(null);
-                }}
-                className="px-4 py-2 rounded-card text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
-              >
-                Delete
-              </button>
-            </div>
+          <p className="text-[#2c1505] mb-4">
+            Are you sure you want to delete {deleteDescription}? This cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteLogId(null)}
+              className="px-4 py-2 rounded border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onDeleteLog(confirmDeleteLogId);
+                setConfirmDeleteLogId(null);
+              }}
+              className="px-4 py-2 rounded text-white bg-red-700 hover:bg-red-800 font-medium transition-colors"
+            >
+              Delete
+            </button>
           </div>
-        </div>
+        </ScrollModal>
       )}
     </div>
   );

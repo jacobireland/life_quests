@@ -69,6 +69,10 @@ interface ArchetypeSelectProps {
   iconColor: string;
   'aria-labelledby'?: string;
   className?: string;
+  /** Optional class for the trigger button (e.g. parchment bg when inside ScrollModal). */
+  triggerClassName?: string;
+  /** Optional class for the dropdown list (e.g. parchment bg when inside ScrollModal). */
+  listClassName?: string;
 }
 
 /**
@@ -82,6 +86,8 @@ export function ArchetypeSelect({
   iconColor,
   'aria-labelledby': ariaLabelledBy,
   className = '',
+  triggerClassName = '',
+  listClassName = '',
 }: ArchetypeSelectProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,7 +121,7 @@ export function ArchetypeSelect({
         aria-labelledby={ariaLabelledBy}
         aria-activedescendant={open ? `${id}-option-${value}` : undefined}
         onClick={() => setOpen((prev) => !prev)}
-        className="input-base w-full flex items-center gap-2 text-left min-h-[2.25rem]"
+        className={`input-base w-full flex items-center gap-2 text-left min-h-[2.25rem] ${triggerClassName}`.trim()}
       >
         <ArchetypeIcon archetype={value} color={color} size={18} />
         <span>{ACTIVITY_ARCHETYPE_LABELS[value]}</span>
@@ -124,7 +130,7 @@ export function ArchetypeSelect({
         <ul
           role="listbox"
           aria-labelledby={ariaLabelledBy}
-          className="absolute z-50 mt-1 w-full rounded-card border border-[var(--color-tertiary)] bg-[var(--color-foreground)] shadow-lg max-h-60 overflow-y-auto py-1"
+          className={`absolute z-50 mt-1 w-full rounded-card shadow-lg max-h-60 overflow-y-auto py-1 ${listClassName ? listClassName : 'border border-[var(--color-tertiary)] bg-[var(--color-foreground)]'}`.trim()}
         >
           {ACTIVITY_ARCHETYPES.map((arch) => (
             <li
