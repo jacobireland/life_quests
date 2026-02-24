@@ -118,7 +118,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
 
   const openLogModal = (activity: Activity) => {
     setLogModalActivity(activity);
-    setLogHours('');
+    setLogHours('1.0');
     setLogNotes('');
     setLogTimestamp(new Date());
   };
@@ -429,12 +429,12 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                 <input
                   id="log-hours"
                   type="number"
-                  step="0.25"
-                  min="0.25"
+                  step="1"
+                  min="1"
                   value={logHours}
                   onChange={(e) => setLogHours(e.target.value)}
                   className={`input-base w-full ${SCROLL_INPUT_CLASS}`}
-                  placeholder="e.g., 2.5"
+                  placeholder="e.g., 1.5 or 2"
                   required
                 />
               </div>
@@ -454,7 +454,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
             </div>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 rounded px-4 py-2 font-medium text-sm bg-[#b8860b] text-white hover:brightness-110 transition-all">
-                {isSideQuest ? 'Complete Quest' : 'Log'}
+                {isSideQuest ? 'Complete Quest' : isHourlyQuest ? 'Log hours' : 'Log occurrence'}
               </button>
               <button
                 type="button"
