@@ -105,7 +105,6 @@ export function useQuestData() {
     (
       questId: string,
       hours: number | undefined,
-      title?: string | null,
       notes?: string | null,
       submittedAt?: string,
     ) => {
@@ -116,7 +115,6 @@ export function useQuestData() {
           activityId: questId,
           ...(hours != null ? { hours } : {}),
           submittedAt: submittedAt ?? new Date().toISOString(),
-          ...(title != null && title !== '' ? { title } : {}),
           ...(notes != null && notes !== '' ? { notes } : {}),
         },
       ]);

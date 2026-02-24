@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
-import { getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
+import { formatDateWithTodayYesterday, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ArchetypeIcon } from './archetype-icon';
 import { ScrollModal } from './ScrollModal';
 
@@ -11,16 +11,6 @@ interface RecentLogsProps {
   /** When 'campaigns', show only campaign logs; when 'sideQuests', show only side quest logs. */
   kindTab: 'campaigns' | 'sideQuests';
   onDeleteLog: (id: string) => void;
-}
-
-function formatLogDate(dateString: string): string {
-  const date = parseLocalDate(dateString);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Today';
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatLoggedAt(isoString: string | null | undefined): string | null {
@@ -34,17 +24,6 @@ function formatLoggedAt(isoString: string | null | undefined): string | null {
 /** Date only (YYYY-MM-DD) for grouping by "logged at" day. */
 function getLoggedAtDateKey(log: ActivityLog): string {
   return getDateStringFromISO(log.submittedAt);
-}
-
-/** Section header: "Feb 23, 2026" (or "Today" / "Yesterday"). */
-function formatSectionDate(dateKey: string): string {
-  const date = parseLocalDate(dateKey);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Today';
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /** Time only for use under a date header: "3:45 PM". */
@@ -121,7 +100,7 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
   const deleteLog = confirmDeleteLogId ? logs.find((l) => l.id === confirmDeleteLogId) : null;
   const deleteActivity = deleteLog ? activityById.get(deleteLog.activityId) : null;
   const deleteDescription =
-    deleteActivity ? `"${deleteActivity.name}${deleteLog?.title?.trim() ? ` — ${deleteLog.title.trim()}` : ''}"` : 'this log';
+    deleteActivity ? `"${deleteActivity.name}${deleteLog?.notes?.trim() ? ` — ${deleteLog.notes.trim()}` : ''}"` : 'this log';
 
   return (
     <div className="card">
@@ -144,7 +123,7 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
           {logsByDate.map(([dateKey, groupLogs]) => (
             <section key={dateKey} className="space-y-2 min-w-0">
               <h3 className="text-xs font-medium text-foreground-muted uppercase tracking-wide sticky top-0 z-10 bg-surface-card py-1 pr-2">
-                {formatSectionDate(dateKey)}
+                {formatDateWithTodayYesterday(dateKey)}
               </h3>
               {groupLogs.map((log) => {
                 const activity = activityById.get(log.activityId);
@@ -173,16 +152,18 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-foreground-text">
                         {activity.name}
-                        {!isSideQuest && log.title?.trim() && (
-                          <span className="font-normal text-foreground-muted"> — {log.title.trim()}</span>
+                        {!isSideQuest && (log.notes?.trim() || log.title?.trim()) && (
+                          <span className="font-normal text-foreground-muted">
+                            — {(log.notes?.trim() || log.title?.trim())}
+                          </span>
                         )}
                       </div>
                       <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
                         {isSideQuest ? (
-                          <>Completed on {formatLogDate(getDateStringFromISO(log.submittedAt))}</>
+                          <>Completed on {formatDateWithTodayYesterday(getDateStringFromISO(log.submittedAt))}</>
                         ) : (
                           <>
-                            {formatLogDate(getDateStringFromISO(log.submittedAt))}
+                            {formatDateWithTodayYesterday(getDateStringFromISO(log.submittedAt))}
                             {log.hours != null && (
                               <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
                             )}
@@ -236,12 +217,6 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
             <div className="text-sm font-medium text-[#6b5344] mb-1">Logged</div>
             <div className="text-[#2c1505]">{formatLoggedAt(viewLog.submittedAt)}</div>
           </div>
-          {viewLog.title?.trim() && (
-            <div>
-              <div className="text-sm font-medium text-[#6b5344] mb-1">Title</div>
-              <div className="text-[#2c1505]">{viewLog.title.trim()}</div>
-            </div>
-          )}
           {viewLog.notes?.trim() && (
             <div>
               <div className="text-sm font-medium text-[#6b5344] mb-1">Notes</div>

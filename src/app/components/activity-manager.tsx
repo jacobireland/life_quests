@@ -47,12 +47,13 @@ export function ActivityManager({
   const selectedQuest = selectedQuestId ? activities.find((a) => a.id === selectedQuestId) : null;
   const questToRemove = confirmRemoveQuestId ? activities.find((a) => a.id === confirmRemoveQuestId) : null;
 
-  const displayActivities = useMemo(() => {
-    const list = activities.filter((a) =>
-      managerTab === 'campaigns' ? (a.kind ?? 'campaign') === 'campaign' : a.kind === 'sideQuest',
-    );
-    return list;
-  }, [activities, managerTab]);
+  const displayActivities = useMemo(
+    () =>
+      activities.filter((a) =>
+        managerTab === 'campaigns' ? (a.kind ?? 'campaign') === 'campaign' : a.kind === 'sideQuest',
+      ),
+    [activities, managerTab],
+  );
 
   useEffect(() => {
     if (editModalOpen && displayActivities.length > 0) {
@@ -100,28 +101,24 @@ export function ActivityManager({
     e.preventDefault();
     if (!newQuestName.trim()) return;
     const kind: ActivityKind = managerTab === 'campaigns' ? 'campaign' : 'sideQuest';
-    if (kind === 'sideQuest') {
-      onAddQuest({
-        name: newQuestName.trim(),
-        color: newQuestColor,
-        goals: [],
-        startDate: getTodayLocal(),
-        endDate: null,
-        kind: 'sideQuest',
-        notes: newQuestNotes.trim() || null,
-        archetype: newQuestArchetype,
-      });
-    } else {
-      onAddQuest({
-        name: newQuestName.trim(),
-        color: newQuestColor,
-        goals: newQuestGoals,
-        startDate: newQuestStartDate,
-        endDate: newQuestEndDate || null,
-        kind: 'campaign',
-        archetype: newQuestArchetype,
-      });
-    }
+    onAddQuest({
+      name: newQuestName.trim(),
+      color: newQuestColor,
+      archetype: newQuestArchetype,
+      kind,
+      ...(kind === 'sideQuest'
+        ? {
+            goals: [],
+            startDate: getTodayLocal(),
+            endDate: null,
+            notes: newQuestNotes.trim() || null,
+          }
+        : {
+            goals: newQuestGoals,
+            startDate: newQuestStartDate,
+            endDate: newQuestEndDate || null,
+          }),
+    });
     resetAddForm();
   };
 
