@@ -34,6 +34,15 @@ export function getDateStringFromISO(isoString: string): string {
   return `${y}-${m}-${day}`;
 }
 
+/** "Feb 24, 2026" from an ISO timestamp (date only, no Today/Yesterday). */
+export function formatDateOnly(isoString: string): string {
+  return parseLocalDate(getDateStringFromISO(isoString)).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 /** "Today", "Yesterday", or "Feb 23, 2026" for a YYYY-MM-DD string. */
 export function formatDateWithTodayYesterday(dateString: string): string {
   const date = parseLocalDate(dateString);
@@ -43,6 +52,39 @@ export function formatDateWithTodayYesterday(dateString: string): string {
   if (date.toDateString() === today.toDateString()) return 'Today';
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const LOCALE_OPTS = { month: 'short' as const, day: 'numeric' as const, year: 'numeric' as const, hour: 'numeric' as const, minute: '2-digit' as const, hour12: true };
+
+/** "Feb 23, 2026, 3:45 PM" for a Date (e.g. timestamp display). */
+export function formatDateTimeDisplay(d: Date): string {
+  return d.toLocaleString('en-US', LOCALE_OPTS);
+}
+
+/** "3:45 PM" from an ISO string. */
+export function formatTimeOnly(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  return new Date(isoString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/** "Feb 23, 2026 at 3:45 PM" from an ISO string. */
+export function formatDateTimeLogged(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${datePart} at ${timePart}`;
+}
+
+/** "hour" or "hours" for display. */
+export function formatHourLabel(hours: number): string {
+  return hours === 1 ? 'hour' : 'hours';
+}
+
+/** YYYY-MM-DDTHH:mm for datetime-local input. */
+export function toDateTimeLocalString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function startOfWeek(d: Date): Date {

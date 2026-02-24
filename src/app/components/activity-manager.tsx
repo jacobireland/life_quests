@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Activity, ActivityArchetype, ActivityKind, NewQuestData, QuestGoal } from '../types';
+import type { Activity, ActivityArchetype, ActivityKind, ActivityLog, NewQuestData, QuestGoal } from '../types';
 import { ACTIVITY_ARCHETYPES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
-import { getTodayLocal } from '../utils/date';
+import { formatDateOnly, getDateStringFromISO, getTodayLocal } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon, ArchetypeSelect } from './archetype-icon';
 import { ScrollModal } from './ScrollModal';
 
@@ -12,11 +12,14 @@ const DEFAULT_GOAL: QuestGoal = { amount: 2, unit: 'hours', timeRange: 'week' };
 
 const TIME_RANGE_ORDER = ['day', 'week', 'month'] as const;
 
+const OBJECTIVE_HINT = 'e.g. 2 hours every week, or 3 occurrences per month';
+
 const MANAGER_TABS = ['campaigns', 'sideQuests'] as const;
 type ManagerTab = (typeof MANAGER_TABS)[number];
 
 interface ActivityManagerProps {
   activities: Activity[];
+  logs: ActivityLog[];
   activeTab: ManagerTab;
   onTabChange: (tab: ManagerTab) => void;
   onAddQuest: (data: NewQuestData) => void;
@@ -26,6 +29,7 @@ interface ActivityManagerProps {
 
 export function ActivityManager({
   activities,
+  logs,
   activeTab: managerTab,
   onTabChange: setManagerTab,
   onAddQuest,
@@ -55,6 +59,23 @@ export function ActivityManager({
     [activities, managerTab],
   );
 
+  /** For side quests only: incomplete = no logs yet, completed = at least one log. */
+  const { incompleteSideQuests, completedSideQuests } = useMemo(() => {
+    if (managerTab !== 'sideQuests') {
+      return { incompleteSideQuests: [] as Activity[], completedSideQuests: [] as Activity[] };
+    }
+    const completedIds = new Set(logs.map((l) => l.activityId));
+    const incomplete: Activity[] = [];
+    const completed: Activity[] = [];
+    for (const a of displayActivities) {
+      (completedIds.has(a.id) ? completed : incomplete).push(a);
+    }
+    return {
+      incompleteSideQuests: incomplete.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+      completedSideQuests: completed.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    };
+  }, [managerTab, displayActivities, logs]);
+
   useEffect(() => {
     if (editModalOpen && displayActivities.length > 0) {
       const inList = selectedQuestId && displayActivities.some((a) => a.id === selectedQuestId);
@@ -74,10 +95,11 @@ export function ActivityManager({
     return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   };
 
-  /** Groups display activities by archetype; only includes archetypes that have at least one. */
+  /** Groups display activities by archetype; for side quests uses only incomplete (completed shown in separate section). */
   const activitiesByArchetype = useMemo(() => {
+    const source = managerTab === 'sideQuests' ? incompleteSideQuests : displayActivities;
     const byArchetype = new Map<ActivityArchetype, Activity[]>();
-    for (const a of displayActivities) {
+    for (const a of source) {
       const arch = a.archetype ?? 'warrior';
       const list = byArchetype.get(arch) ?? [];
       list.push(a);
@@ -89,7 +111,7 @@ export function ActivityManager({
         archetype,
         activities: [...(byArchetype.get(archetype) ?? [])].sort(sortActivity),
       }));
-  }, [displayActivities, managerTab]);
+  }, [displayActivities, managerTab, incompleteSideQuests]);
 
   const handleUpdateGoal = (field: keyof QuestGoal, value: number | string) => {
     setNewQuestGoals((prev) => [
@@ -153,54 +175,102 @@ export function ActivityManager({
       </div>
 
       <div className="space-y-4 mb-4">
-        {activitiesByArchetype.length === 0 ? (
+        {managerTab === 'sideQuests' && incompleteSideQuests.length === 0 && completedSideQuests.length === 0 ? (
           <p className="text-foreground-subtle text-sm">
-            {managerTab === 'campaigns' ? 'No campaigns yet. Add one below!' : 'No side quests yet. Add one below!'}
+            No side quests yet. Add one below!
+          </p>
+        ) : managerTab === 'campaigns' && activitiesByArchetype.length === 0 ? (
+          <p className="text-foreground-subtle text-sm">
+            No campaigns yet. Add one below!
           </p>
         ) : (
-          activitiesByArchetype.map(({ archetype, activities }) => (
-            <section key={archetype} className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
-                <ArchetypeIcon archetype={archetype} color="#6b7280" size={16} />
-                {ACTIVITY_ARCHETYPE_LABELS[archetype]}
-              </h3>
-              {activities.map((activity) => {
-                const goal = activity.goals[0];
-                const timeRangeLabel =
-                  managerTab === 'campaigns' && goal
-                    ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives' }[goal.timeRange]
-                    : null;
-                return (
-                  <button
-                    key={activity.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedQuestId(activity.id);
-                      setEditModalOpen(true);
-                    }}
-                    className="w-full flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
-                  >
-                    <ArchetypeIcon
-                      archetype={activity.archetype ?? 'warrior'}
-                      color={activity.color}
-                      size={20}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-foreground-text font-medium">{activity.name}</span>
-                      {managerTab === 'sideQuests' && activity.notes && (
-                        <p className="text-foreground-muted text-sm mt-0.5 line-clamp-2">{activity.notes}</p>
+          <>
+            {activitiesByArchetype.map(({ archetype, activities }) => (
+              <section key={archetype} className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground-secondary flex items-center gap-2">
+                  <ArchetypeIcon archetype={archetype} color="#6b7280" size={16} />
+                  {ACTIVITY_ARCHETYPE_LABELS[archetype]}
+                </h3>
+                {activities.map((activity) => {
+                  const goal = activity.goals[0];
+                  const timeRangeLabel =
+                    managerTab === 'campaigns' && goal
+                      ? { day: 'Daily Objectives', week: 'Weekly Objectives', month: 'Monthly Objectives' }[goal.timeRange]
+                      : null;
+                  return (
+                    <button
+                      key={activity.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedQuestId(activity.id);
+                        setEditModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
+                    >
+                      <ArchetypeIcon
+                        archetype={activity.archetype ?? 'warrior'}
+                        color={activity.color}
+                        size={20}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-foreground-text font-medium">{activity.name}</span>
+                        {managerTab === 'sideQuests' && activity.notes && (
+                          <p className="text-foreground-muted text-sm mt-0.5 line-clamp-2">{activity.notes}</p>
+                        )}
+                      </div>
+                      {timeRangeLabel && (
+                        <span className="text-foreground-muted text-sm ml-auto flex-shrink-0">
+                          {timeRangeLabel}
+                        </span>
                       )}
-                    </div>
-                    {timeRangeLabel && (
-                      <span className="text-foreground-muted text-sm ml-auto flex-shrink-0">
-                        {timeRangeLabel}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </section>
-          ))
+                    </button>
+                  );
+                })}
+              </section>
+            ))}
+            {managerTab === 'sideQuests' && completedSideQuests.length > 0 && (
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold text-foreground-secondary mb-2">Completed</h3>
+                <ul className="space-y-1.5">
+                  {completedSideQuests.map((activity) => {
+                    const latestLog = [...logs]
+                      .filter((l) => l.activityId === activity.id)
+                      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0];
+                    const completedOn = latestLog ? formatDateOnly(latestLog.submittedAt) : null;
+                    return (
+                      <li key={activity.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedQuestId(activity.id);
+                            setEditModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm text-left hover:bg-green-100 transition-colors"
+                        >
+                          <ArchetypeIcon
+                            archetype={activity.archetype ?? 'warrior'}
+                            color={activity.color}
+                            size={14}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-foreground-text text-sm">{activity.name}</span>
+                            {completedOn && (
+                              <span className="text-green-800/70 text-xs block mt-0.5">
+                                {completedOn}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-green-800 whitespace-nowrap">
+                            Quest Completed
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+          </>
         )}
       </div>
 
@@ -233,7 +303,7 @@ export function ActivityManager({
                 value={newQuestName}
                 onChange={(e) => setNewQuestName(e.target.value)}
                 placeholder={managerTab === 'sideQuests' ? 'Side quest title' : 'Campaign Name'}
-                className="input-base w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                className="input-base w-full scroll-input"
                 autoFocus
               />
             </div>
@@ -263,7 +333,7 @@ export function ActivityManager({
                   value={newQuestNotes}
                   onChange={(e) => setNewQuestNotes(e.target.value)}
                   placeholder="Any details or context..."
-                  className="w-full min-h-[80px] resize-y rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  className="w-full min-h-[80px] resize-y scroll-input"
                   rows={3}
                 />
               </div>
@@ -274,7 +344,7 @@ export function ActivityManager({
                     Objective
                   </label>
                   <p className="text-[#6b5344] text-xs mb-2">
-                    e.g. 2 hours every week, or 3 occurrences per month
+                    {OBJECTIVE_HINT}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
                     <input
@@ -282,12 +352,12 @@ export function ActivityManager({
                       min={1}
                       value={newQuestGoals[0]?.amount ?? DEFAULT_GOAL.amount}
                       onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                      className="w-16 text-center py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                      className="w-16 text-center py-1.5 scroll-input"
                     />
                     <select
                       value={newQuestGoals[0]?.unit ?? DEFAULT_GOAL.unit}
                       onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                      className="flex-1 min-w-[100px] py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                      className="flex-1 min-w-[100px] py-1.5 scroll-input"
                     >
                       {QUEST_GOAL_UNITS.map((u) => (
                         <option key={u} value={u}>{u}</option>
@@ -297,7 +367,7 @@ export function ActivityManager({
                     <select
                       value={newQuestGoals[0]?.timeRange ?? DEFAULT_GOAL.timeRange}
                       onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                      className="flex-1 min-w-[100px] py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                      className="flex-1 min-w-[100px] py-1.5 scroll-input"
                     >
                       {QUEST_GOAL_TIME_RANGES.map((tr) => (
                         <option key={tr} value={tr}>{tr}</option>
@@ -316,7 +386,7 @@ export function ActivityManager({
                       type="date"
                       value={newQuestStartDate}
                       onChange={(e) => setNewQuestStartDate(e.target.value)}
-                      className="w-full py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                      className="w-full py-1.5 scroll-input"
                     />
                   </div>
                   <div>
@@ -328,7 +398,7 @@ export function ActivityManager({
                       type="date"
                       value={newQuestEndDate ?? ''}
                       onChange={(e) => setNewQuestEndDate(e.target.value || null)}
-                      className="w-full py-1.5 rounded border border-[#8b5a2b] bg-[#fdf5e6] text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                      className="w-full py-1.5 scroll-input"
                     />
                   </div>
                 </div>
@@ -354,7 +424,7 @@ export function ActivityManager({
                     const v = e.target.value.trim();
                     if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
                   }}
-                  className="flex-1 max-w-[8rem] font-mono text-sm rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  className="flex-1 max-w-[8rem] font-mono text-sm scroll-input"
                   placeholder="#3b82f6"
                 />
               </div>
@@ -384,45 +454,24 @@ export function ActivityManager({
             setSelectedQuestId(null);
           }}
           title={managerTab === 'sideQuests' ? 'Edit Side Quest' : 'Edit Campaign'}
-          contentClassName="max-h-[65vh] overflow-y-auto"
+          contentClassName="max-h-[65vh] overflow-y-auto space-y-4"
         >
-          {displayActivities.length === 0 ? (
+          {selectedQuest ? (
+            <EditQuestForm
+              key={selectedQuest.id}
+              quest={selectedQuest}
+              isSideQuest={selectedQuest.kind === 'sideQuest'}
+              onSave={(update) => {
+                onUpdateQuest(selectedQuest.id, update);
+                setSelectedQuestId(null);
+                setEditModalOpen(false);
+              }}
+              onRemove={() => setConfirmRemoveQuestId(selectedQuest.id)}
+            />
+          ) : (
             <p className="text-[#6b5344] text-sm">
               {managerTab === 'campaigns' ? 'No campaigns yet.' : 'No side quests yet.'}
             </p>
-          ) : (
-            <>
-              <div className="mb-4">
-                <label htmlFor="edit-quest-select" className="block text-sm font-medium text-[#5a3210] mb-2">
-                  {managerTab === 'campaigns' ? 'Campaign' : 'Side Quest'}
-                </label>
-                <select
-                  id="edit-quest-select"
-                  value={selectedQuestId ?? ''}
-                  onChange={(e) => setSelectedQuestId(e.target.value || null)}
-                  className="w-full rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
-                >
-                  {displayActivities.map((activity) => (
-                    <option key={activity.id} value={activity.id}>
-                      {activity.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {selectedQuest && (
-                <EditQuestForm
-                  key={selectedQuest.id}
-                  quest={selectedQuest}
-                  isSideQuest={selectedQuest.kind === 'sideQuest'}
-                  onSave={(update) => {
-                    onUpdateQuest(selectedQuest.id, update);
-                    setSelectedQuestId(null);
-                    setEditModalOpen(false);
-                  }}
-                  onRemove={() => setConfirmRemoveQuestId(selectedQuest.id)}
-                />
-              )}
-            </>
           )}
         </ScrollModal>
       )}
@@ -494,97 +543,22 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
     }
   };
 
-  const inputScroll =
-    'rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]';
-
   return (
-    <div className="mt-4 p-3 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80 space-y-4">
+    <>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="edit-quest-title" className="block text-sm font-medium text-[#5a3210] mb-1">
-            Title
+            {isSideQuest ? 'Quest Objective' : 'Title'}
           </label>
           <input
             id="edit-quest-title"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`input-base w-full ${inputScroll}`}
+            placeholder={isSideQuest ? 'Side quest title' : 'Campaign Name'}
+            className="input-base w-full scroll-input"
           />
         </div>
-        {isSideQuest ? (
-          <div>
-            <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
-              Notes <span className="text-[#6b5344]">(optional)</span>
-            </label>
-            <textarea
-              id="edit-quest-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any details or context..."
-              className={`w-full min-h-[80px] resize-y ${inputScroll}`}
-              rows={3}
-            />
-          </div>
-        ) : (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-[#5a3210] mb-2">
-                Quest goal
-              </label>
-              <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
-                <input
-                  type="number"
-                  min={1}
-                  value={goal.amount}
-                  onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                  className={`w-16 text-center py-1.5 ${inputScroll}`}
-                />
-                <select
-                  value={goal.unit}
-                  onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                  className={`flex-1 min-w-[100px] py-1.5 ${inputScroll}`}
-                >
-                  {QUEST_GOAL_UNITS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <span className="text-[#6b5344] text-sm">per</span>
-                <select
-                  value={goal.timeRange}
-                  onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                  className={`flex-1 min-w-[100px] py-1.5 ${inputScroll}`}
-                >
-                  {QUEST_GOAL_TIME_RANGES.map((tr) => (
-                    <option key={tr} value={tr}>{tr}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-sm font-medium text-[#5a3210] mb-1">Start date</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className={`w-full py-1.5 ${inputScroll}`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#5a3210] mb-1">
-                  End date <span className="text-[#6b5344]">(optional)</span>
-                </label>
-                <input
-                  type="date"
-                  value={endDate ?? ''}
-                  onChange={(e) => setEndDate(e.target.value || null)}
-                  className={`w-full py-1.5 ${inputScroll}`}
-                />
-              </div>
-            </div>
-          </>
-        )}
         <div>
           <label id="edit-quest-archetype-label" htmlFor="edit-quest-archetype" className="block text-sm font-medium text-[#5a3210] mb-2">
             Archetype
@@ -599,6 +573,82 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             listClassName="border border-[#8b5a2b]/50 bg-[#faf0dc]"
           />
         </div>
+        {isSideQuest ? (
+          <div>
+            <label htmlFor="edit-quest-notes" className="block text-sm font-medium text-[#5a3210] mb-1">
+              Notes <span className="text-[#6b5344]">(optional)</span>
+            </label>
+            <textarea
+              id="edit-quest-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any details or context..."
+              className="w-full min-h-[80px] resize-y scroll-input"
+              rows={3}
+            />
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-[#5a3210] mb-2">
+                Objective
+              </label>
+              <p className="text-[#6b5344] text-xs mb-2">
+                {OBJECTIVE_HINT}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
+                <input
+                  type="number"
+                  min={1}
+                  value={goal.amount}
+                  onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
+                  className="w-16 text-center py-1.5 scroll-input"
+                />
+                <select
+                  value={goal.unit}
+                  onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
+                  className="flex-1 min-w-[100px] py-1.5 scroll-input"
+                >
+                  {QUEST_GOAL_UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <span className="text-[#6b5344] text-sm">per</span>
+                <select
+                  value={goal.timeRange}
+                  onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
+                  className="flex-1 min-w-[100px] py-1.5 scroll-input"
+                >
+                  {QUEST_GOAL_TIME_RANGES.map((tr) => (
+                    <option key={tr} value={tr}>{tr}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-[#5a3210] mb-1">Start date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full py-1.5 scroll-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#5a3210] mb-1">
+                  End date <span className="text-[#6b5344]">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={endDate ?? ''}
+                  onChange={(e) => setEndDate(e.target.value || null)}
+                  className="w-full py-1.5 scroll-input"
+                />
+              </div>
+            </div>
+          </>
+        )}
         <div>
           <label htmlFor="edit-quest-color" className="block text-sm font-medium text-[#5a3210] mb-2">
             Color
@@ -618,7 +668,7 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
                 const v = e.target.value.trim();
                 if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
               }}
-              className={`flex-1 max-w-[8rem] font-mono text-sm ${inputScroll}`}
+              className="flex-1 max-w-[8rem] font-mono text-sm scroll-input"
               placeholder="#3b82f6"
             />
           </div>
@@ -627,16 +677,16 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
           <button type="submit" className="flex-1 rounded px-4 py-2 font-medium text-sm bg-[#b8860b] text-white hover:brightness-110 transition-all">
             Save changes
           </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex-1 rounded px-4 py-2 font-medium text-sm border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Remove quest
+          </button>
         </div>
       </form>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="flex items-center gap-2 text-sm text-destructive hover:text-destructive-hover transition-colors"
-      >
-        <Trash2 className="w-4 h-4" />
-        Remove quest
-      </button>
-    </div>
+    </>
   );
 }

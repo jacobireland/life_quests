@@ -77,6 +77,16 @@
     border-color: var(--color-primary);
   }
 
+  /* Parchment-style inputs (ScrollModal, activity forms) */
+  .scroll-input {
+    @apply rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505];
+  }
+  .scroll-input::placeholder {
+    @apply text-[#6b5344]/70;
+  }
+  .scroll-input:focus {
+    @apply border-[#b8860b] outline-none ring-1 ring-[#b8860b];
+  }
 }
 
 /* Heading font for tabs and titles (outside layer so it overrides inherited body font) */

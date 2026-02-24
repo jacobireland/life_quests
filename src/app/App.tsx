@@ -32,6 +32,7 @@ export default function App() {
           <div className="space-y-6">
             <ActivityManager
               activities={quests}
+              logs={logs}
               activeTab={activitiesKindTab}
               onTabChange={setActivitiesKindTab}
               onAddQuest={addQuest}

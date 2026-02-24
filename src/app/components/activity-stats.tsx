@@ -1,7 +1,7 @@
 import React, { useMemo, useState, type FormEvent } from 'react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
 import { ScrollModal } from './ScrollModal';
-import { formatDateWithTodayYesterday, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, type PeriodTimeRange } from '../utils/date';
+import { formatDateWithTodayYesterday, formatDateTimeDisplay, formatHourLabel, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, toDateTimeLocalString, type PeriodTimeRange } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
 
 const TIME_RANGES = ['day', 'week', 'month'] as const;
@@ -12,9 +12,6 @@ const TAB_LABELS: Record<TimeRangeTab, string> = {
   week: 'Weekly',
   month: 'Monthly',
 };
-
-const SCROLL_INPUT_CLASS =
-  'rounded border border-[#8b5a2b] bg-[#fdf5e6] px-3 py-2 text-[#2c1505] placeholder:text-[#6b5344]/70 focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]';
 
 interface ActivityStatsProps {
   activities: Activity[];
@@ -45,25 +42,14 @@ function formatGoalLabel(goal: QuestGoal): string {
   return `${goal.amount} ${unitLabel} / ${rangeLabel}`;
 }
 
-/** Format a Date for display (e.g. Feb 23, 2026, 3:45 PM). */
-function formatTimestampDisplay(d: Date): string {
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
 export function ActivityStats({ activities, logs, kindTab, onLogActivity }: ActivityStatsProps) {
-  const [activeTab, setActiveTab] = useState<TimeRangeTab>('week');
+  const [activeTab, setActiveTab] = useState<TimeRangeTab>('day');
   const [logModalActivity, setLogModalActivity] = useState<Activity | null>(null);
   const [viewCompletedActivity, setViewCompletedActivity] = useState<Activity | null>(null);
   const [logHours, setLogHours] = useState('');
   const [logNotes, setLogNotes] = useState('');
   const [logTimestamp, setLogTimestamp] = useState<Date>(() => new Date());
+  const [editingTimestamp, setEditingTimestamp] = useState(false);
 
   const displayActivities = useMemo(
     () =>
@@ -73,13 +59,10 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
     [activities, kindTab],
   );
 
-  const { completedSideQuests, incompleteSideQuests } = useMemo(() => {
+  const incompleteSideQuests = useMemo(() => {
     const sideQuests = activities.filter((a) => a.kind === 'sideQuest');
     const completedIds = new Set(logs.map((l) => l.activityId));
-    return {
-      completedSideQuests: sideQuests.filter((a) => completedIds.has(a.id)),
-      incompleteSideQuests: sideQuests.filter((a) => !completedIds.has(a.id)),
-    };
+    return sideQuests.filter((a) => !completedIds.has(a.id));
   }, [activities, logs]);
 
   const { completed, current } = useMemo(() => {
@@ -121,9 +104,13 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
     setLogHours('1.0');
     setLogNotes('');
     setLogTimestamp(new Date());
+    setEditingTimestamp(false);
   };
 
-  const closeLogModal = () => setLogModalActivity(null);
+  const closeLogModal = () => {
+    setLogModalActivity(null);
+    setEditingTimestamp(false);
+  };
 
   /** Logs that completed this activity: for campaigns, period logs; for side quests, all logs. Sorted by date desc. */
   const getLogsForCompletedActivity = (activity: Activity): ActivityLog[] => {
@@ -189,80 +176,37 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
       )}
 
       {kindTab === 'sideQuests' ? (
-        incompleteSideQuests.length === 0 && completedSideQuests.length === 0 ? (
+        incompleteSideQuests.length === 0 ? (
           <p className="text-foreground-subtle text-sm">
             No side quests yet. Add one in the Activity Manager.
           </p>
         ) : (
-          <div className="space-y-6">
-            {incompleteSideQuests.length > 0 && (
-              <section>
-                <ul className="space-y-3">
-                  {incompleteSideQuests.map((activity) => (
-                    <li key={activity.id}>
-                      <button
-                        type="button"
-                        onClick={() => openLogModal(activity)}
-                        className="w-full flex items-start gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
-                      >
-                        <ArchetypeIcon
-                          archetype={activity.archetype ?? 'warrior'}
-                          color={activity.color}
-                          size={20}
-                          className="mt-0.5"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-foreground-text">{activity.name}</span>
-                          {activity.notes && (
-                            <p className="text-foreground-muted text-sm mt-1.5 whitespace-pre-wrap">
-                              {activity.notes}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-            {completedSideQuests.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-foreground-secondary mb-2">Completed</h3>
-                <ul className="space-y-1.5">
-                  {completedSideQuests.map((activity) => {
-                    const latestLog = getLogsForCompletedActivity(activity)[0];
-                    const completedOn = latestLog ? formatDateWithTodayYesterday(getDateStringFromISO(latestLog.submittedAt)) : null;
-                    return (
-                      <li key={activity.id}>
-                        <button
-                          type="button"
-                          onClick={() => setViewCompletedActivity(activity)}
-                          className="w-full flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm text-left hover:bg-green-100 transition-colors"
-                        >
-                          <ArchetypeIcon
-                            archetype={activity.archetype ?? 'warrior'}
-                            color={activity.color}
-                            size={14}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium text-foreground-text text-sm">{activity.name}</span>
-                            {completedOn && (
-                              <span className="text-green-800/70 text-xs ml-1.5">
-                                Completed on {completedOn}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs font-medium text-green-800 whitespace-nowrap">
-                            Side quest complete
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
-          </div>
+          <ul className="space-y-3">
+            {incompleteSideQuests.map((activity) => (
+              <li key={activity.id}>
+                <button
+                  type="button"
+                  onClick={() => openLogModal(activity)}
+                  className="w-full flex items-start gap-3 p-3 rounded-card border border-border bg-surface-muted text-left hover:bg-surface-subtle transition-colors"
+                >
+                  <ArchetypeIcon
+                    archetype={activity.archetype ?? 'warrior'}
+                    color={activity.color}
+                    size={20}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground-text">{activity.name}</span>
+                    {activity.notes && (
+                      <p className="text-foreground-muted text-sm mt-1.5 whitespace-pre-wrap">
+                        {activity.notes}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
         )
       ) : completed.length === 0 && current.length === 0 ? (
         <p className="text-foreground-subtle text-sm">
@@ -320,10 +264,9 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                   const progress = getProgress(activity);
                   return (
                     <li key={activity.id}>
-                      <button
-                        type="button"
-                        onClick={() => setViewCompletedActivity(activity)}
-                        className="w-full flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm text-left hover:bg-green-100 transition-colors"
+                      <div
+                        className="w-full flex items-center gap-2 p-2 rounded-card border border-green-200 bg-green-50 text-sm text-left cursor-default"
+                        role="presentation"
                       >
                         <ArchetypeIcon
                           archetype={activity.archetype ?? 'warrior'}
@@ -338,13 +281,13 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                         </div>
                         <div className="flex flex-col items-end text-right">
                           <span className="text-xs font-medium text-green-800 whitespace-nowrap">
-                            Checkpoint Achieved!
+                            Objective Achieved!
                           </span>
                           <span className="text-green-800/70 text-[11px] mt-0.5">
                             {formatGoalLabel(goal)}
                           </span>
                         </div>
-                      </button>
+                      </div>
                     </li>
                   );
                 })}
@@ -381,7 +324,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                     {formatDateWithTodayYesterday(getDateStringFromISO(log.submittedAt))}
                     {log.hours != null && (
                       <span className="text-[#6b5344] font-normal ml-1.5">
-                        — {log.hours} {log.hours === 1 ? 'hour' : 'hours'}
+                        — {log.hours} {formatHourLabel(log.hours)}
                       </span>
                     )}
                   </div>
@@ -420,6 +363,11 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
               {isSideQuest ? 'Quest' : 'Campaign'}
             </span>
           </div>
+          {isSideQuest && logModalActivity.notes?.trim() && (
+            <div className="text-sm text-[#2c1505] whitespace-pre-wrap">
+              {logModalActivity.notes.trim()}
+            </div>
+          )}
           <form onSubmit={handleLogSubmit} className="space-y-4">
             {isHourlyQuest && (
               <div>
@@ -433,7 +381,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                   min="1"
                   value={logHours}
                   onChange={(e) => setLogHours(e.target.value)}
-                  className={`input-base w-full ${SCROLL_INPUT_CLASS}`}
+                  className="input-base w-full scroll-input"
                   placeholder="e.g., 1.5 or 2"
                   required
                 />
@@ -441,7 +389,7 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
             )}
             <div>
               <label htmlFor="log-notes" className="block text-xs text-[#6b5344] mb-1">
-                Notes (optional)
+                Add Completion Note
               </label>
               <textarea
                 id="log-notes"
@@ -465,7 +413,29 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
               </button>
             </div>
             <p className="text-xs text-[#6b5344] mt-3 pt-3 border-t border-[#8b5a2b]/20">
-              Timestamp: {formatTimestampDisplay(logTimestamp)}
+              Timestamp:{' '}
+              {editingTimestamp ? (
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalString(logTimestamp)}
+                  max={toDateTimeLocalString(new Date())}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v) setLogTimestamp(new Date(v));
+                  }}
+                  onBlur={() => setEditingTimestamp(false)}
+                  className="ml-1 rounded border border-[#8b5a2b]/40 bg-[#faf0dc]/60 px-2 py-1 text-[#2c1505] focus:border-[#b8860b] focus:outline-none focus:ring-1 focus:ring-[#b8860b]"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingTimestamp(true)}
+                  className="ml-1 text-[#2c1505] cursor-pointer hover:underline focus:outline-none focus:underline"
+                >
+                  {formatDateTimeDisplay(logTimestamp)}
+                </button>
+              )}
             </p>
           </form>
         </ScrollModal>

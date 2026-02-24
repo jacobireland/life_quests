@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
-import { formatDateWithTodayYesterday, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
-import { ArchetypeIcon } from './archetype-icon';
+import { formatDateWithTodayYesterday, formatDateTimeLogged, formatHourLabel, formatTimeOnly, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
+import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
 import { ScrollModal } from './ScrollModal';
 
 interface RecentLogsProps {
@@ -13,28 +13,8 @@ interface RecentLogsProps {
   onDeleteLog: (id: string) => void;
 }
 
-function formatLoggedAt(isoString: string | null | undefined): string | null {
-  if (!isoString) return null;
-  const d = new Date(isoString);
-  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return `Logged ${datePart} at ${timePart}`;
-}
-
-/** Date only (YYYY-MM-DD) for grouping by "logged at" day. */
-function getLoggedAtDateKey(log: ActivityLog): string {
-  return getDateStringFromISO(log.submittedAt);
-}
-
-/** Time only for use under a date header: "3:45 PM". */
-function formatLoggedTime(isoString: string | null | undefined): string | null {
-  if (!isoString) return null;
-  const d = new Date(isoString);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
-
-/** True if this campaign log is the one that pushed period progress to or over the goal (achieved checkpoint). */
-function didLogAchieveCheckpoint(log: ActivityLog, activity: Activity, allLogs: ActivityLog[]): boolean {
+/** True if this campaign log is the one that pushed period progress to or over the goal (achieved objective). */
+function didLogAchieveObjective(log: ActivityLog, activity: Activity, allLogs: ActivityLog[]): boolean {
   const goal: QuestGoal | undefined = activity.goals?.[0];
   if (!goal || (activity.kind ?? 'campaign') !== 'campaign') return false;
 
@@ -86,7 +66,7 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
   const logsByDate = useMemo(() => {
     const map = new Map<string, ActivityLog[]>();
     for (const log of sortedLogs) {
-      const key = getLoggedAtDateKey(log);
+      const key = getDateStringFromISO(log.submittedAt);
       const list = map.get(key) ?? [];
       list.push(log);
       map.set(key, list);
@@ -99,8 +79,6 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
 
   const deleteLog = confirmDeleteLogId ? logs.find((l) => l.id === confirmDeleteLogId) : null;
   const deleteActivity = deleteLog ? activityById.get(deleteLog.activityId) : null;
-  const deleteDescription =
-    deleteActivity ? `"${deleteActivity.name}${deleteLog?.notes?.trim() ? ` — ${deleteLog.notes.trim()}` : ''}"` : 'this log';
 
   return (
     <div className="card">
@@ -130,8 +108,8 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
                 if (!activity) return null;
 
                 const isSideQuest = activity.kind === 'sideQuest';
-                const achievedCheckpoint = !isSideQuest && didLogAchieveCheckpoint(log, activity, logs);
-                const loggedTime = formatLoggedTime(log.submittedAt);
+                const achievedObjective = !isSideQuest && didLogAchieveObjective(log, activity, logs);
+                const loggedTime = formatTimeOnly(log.submittedAt);
 
                 return (
                   <button
@@ -160,15 +138,15 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
                       </div>
                       <div className={`text-sm ${isSideQuest ? 'text-green-800/70' : 'text-foreground-muted'}`}>
                         {isSideQuest ? (
-                          <>Completed on {formatDateWithTodayYesterday(getDateStringFromISO(log.submittedAt))}</>
+                          log.notes?.trim() ? (
+                            <span className="line-clamp-2">{log.notes.trim()}</span>
+                          ) : null
                         ) : (
                           <>
-                            {formatDateWithTodayYesterday(getDateStringFromISO(log.submittedAt))}
+                            {loggedTime}
+                            {loggedTime && log.hours != null && ' • '}
                             {log.hours != null && (
-                              <> • {log.hours} {log.hours === 1 ? 'hour' : 'hours'}</>
-                            )}
-                            {loggedTime && (
-                              <> • {loggedTime}</>
+                              <>{log.hours} {formatHourLabel(log.hours)}</>
                             )}
                           </>
                         )}
@@ -179,9 +157,9 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
                         Completed Side Quest
                       </span>
                     )}
-                    {achievedCheckpoint && (
+                    {achievedObjective && (
                       <span className="text-xs font-medium text-green-800 whitespace-nowrap flex-shrink-0">
-                        Achieved Checkpoint
+                        Achieved Objective
                       </span>
                     )}
                   </button>
@@ -205,21 +183,32 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
               color={viewActivity.color}
               size={20}
             />
-            <span className="text-sm font-medium text-[#5a3210]">Log entry</span>
+            <span className="text-sm font-medium text-[#5a3210]">
+              {ACTIVITY_ARCHETYPE_LABELS[viewActivity.archetype ?? 'warrior']}{' '}
+              {viewActivity.kind === 'sideQuest' ? 'Quest' : 'Campaign'}
+            </span>
           </div>
+          {viewActivity.kind === 'sideQuest' && viewActivity.notes?.trim() && (
+            <div>
+              <div className="text-sm font-medium text-[#6b5344] mb-1">Quest notes</div>
+              <div className="text-[#2c1505] whitespace-pre-wrap">{viewActivity.notes.trim()}</div>
+            </div>
+          )}
           {viewLog.hours != null && (
             <div>
               <div className="text-sm font-medium text-[#6b5344] mb-1">Hours spent</div>
-              <div className="text-[#2c1505]">{viewLog.hours} {viewLog.hours === 1 ? 'hour' : 'hours'}</div>
+              <div className="text-[#2c1505]">{viewLog.hours} {formatHourLabel(viewLog.hours)}</div>
             </div>
           )}
           <div>
             <div className="text-sm font-medium text-[#6b5344] mb-1">Logged</div>
-            <div className="text-[#2c1505]">{formatLoggedAt(viewLog.submittedAt)}</div>
+            <div className="text-[#2c1505]">{formatDateTimeLogged(viewLog.submittedAt)}</div>
           </div>
           {viewLog.notes?.trim() && (
             <div>
-              <div className="text-sm font-medium text-[#6b5344] mb-1">Notes</div>
+              <div className="text-sm font-medium text-[#6b5344] mb-1">
+                {viewActivity.kind === 'sideQuest' ? 'Completion notes' : 'Notes'}
+              </div>
               <div className="text-[#2c1505] whitespace-pre-wrap">{viewLog.notes.trim()}</div>
             </div>
           )}
@@ -252,7 +241,14 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
           title="Delete log?"
         >
           <p className="text-[#2c1505] mb-4">
-            Are you sure you want to delete {deleteDescription}? This cannot be undone.
+            {deleteActivity ? (
+              <>Are you sure you want to delete this log for <strong>{deleteActivity.name}</strong>?</>
+            ) : (
+              'Are you sure you want to delete this log?'
+            )}{' '}
+            Deleting this log will remove any progress it had made towards the campaign objective.
+            <br />
+            This cannot be undone.
           </p>
           <div className="flex gap-2 justify-end">
             <button
