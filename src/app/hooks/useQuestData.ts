@@ -23,22 +23,15 @@ function normalizeLog(raw: Record<string, unknown>): ActivityLog {
   };
 }
 
-const DEFAULT_QUESTS: Activity[] = [
-  { id: '1', name: 'Exercise', color: '#10b981', goals: [], startDate: getTodayLocal(), endDate: null },
-  { id: '2', name: 'Reading', color: '#3b82f6', goals: [], startDate: getTodayLocal(), endDate: null },
-  { id: '3', name: 'Work', color: '#8b5cf6', goals: [], startDate: getTodayLocal(), endDate: null },
-  { id: '4', name: 'Study', color: '#f59e0b', goals: [], startDate: getTodayLocal(), endDate: null },
-];
-
 function loadQuests(): Activity[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.quests);
-    if (!saved) return DEFAULT_QUESTS;
+    if (!saved) return [];
     const parsed: unknown = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return DEFAULT_QUESTS;
+    if (!Array.isArray(parsed)) return [];
     return parsed.map((q) => normalizeQuest(q as Record<string, unknown>));
   } catch {
-    return DEFAULT_QUESTS;
+    return [];
   }
 }
 

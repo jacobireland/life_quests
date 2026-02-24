@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Activity, ActivityArchetype, ActivityKind, ActivityLog, NewQuestData, QuestGoal } from '../types';
-import { ACTIVITY_ARCHETYPES, QUEST_GOAL_UNITS, QUEST_GOAL_TIME_RANGES } from '../types';
+import { ACTIVITY_ARCHETYPES, QUEST_GOAL_TIME_RANGES } from '../types';
 import { formatDateOnly, getDateStringFromISO, getTodayLocal } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon, ArchetypeSelect } from './archetype-icon';
+import { ColorPickerRow } from './ColorPickerRow';
+import { ConfirmModal } from './ConfirmModal';
+import { GoalEditor } from './GoalEditor';
 import { ScrollModal } from './ScrollModal';
 
 const DEFAULT_COLOR = '#000000';
 
 const DEFAULT_GOAL: QuestGoal = { amount: 2, unit: 'hours', timeRange: 'week' };
 
-const TIME_RANGE_ORDER = ['day', 'week', 'month'] as const;
-
-const OBJECTIVE_HINT = 'e.g. 2 hours every week, or 3 occurrences per month';
 
 const MANAGER_TABS = ['campaigns', 'sideQuests'] as const;
 type ManagerTab = (typeof MANAGER_TABS)[number];
@@ -89,8 +89,8 @@ export function ActivityManager({
     }
     const aRange = a.goals[0]?.timeRange;
     const bRange = b.goals[0]?.timeRange;
-    const aIdx = aRange ? TIME_RANGE_ORDER.indexOf(aRange) : TIME_RANGE_ORDER.length;
-    const bIdx = bRange ? TIME_RANGE_ORDER.indexOf(bRange) : TIME_RANGE_ORDER.length;
+    const aIdx = aRange ? QUEST_GOAL_TIME_RANGES.indexOf(aRange) : QUEST_GOAL_TIME_RANGES.length;
+    const bIdx = bRange ? QUEST_GOAL_TIME_RANGES.indexOf(bRange) : QUEST_GOAL_TIME_RANGES.length;
     if (aIdx !== bIdx) return aIdx - bIdx;
     return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   };
@@ -339,43 +339,11 @@ export function ActivityManager({
               </div>
             ) : (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-[#5a3210] mb-2">
-                    Objective
-                  </label>
-                  <p className="text-[#6b5344] text-xs mb-2">
-                    {OBJECTIVE_HINT}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
-                    <input
-                      type="number"
-                      min={1}
-                      value={newQuestGoals[0]?.amount ?? DEFAULT_GOAL.amount}
-                      onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                      className="w-16 text-center py-1.5 scroll-input"
-                    />
-                    <select
-                      value={newQuestGoals[0]?.unit ?? DEFAULT_GOAL.unit}
-                      onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                      className="flex-1 min-w-[100px] py-1.5 scroll-input"
-                    >
-                      {QUEST_GOAL_UNITS.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                    <span className="text-[#6b5344] text-sm">per</span>
-                    <select
-                      value={newQuestGoals[0]?.timeRange ?? DEFAULT_GOAL.timeRange}
-                      onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                      className="flex-1 min-w-[100px] py-1.5 scroll-input"
-                    >
-                      {QUEST_GOAL_TIME_RANGES.map((tr) => (
-                        <option key={tr} value={tr}>{tr}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+                <GoalEditor
+                  goal={newQuestGoals[0] ?? DEFAULT_GOAL}
+                  onChange={handleUpdateGoal}
+                  idPrefix="new"
+                />
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label htmlFor="quest-start" className="block text-sm font-medium text-[#5a3210] mb-1">
@@ -405,30 +373,11 @@ export function ActivityManager({
               </>
             )}
 
-            <div>
-              <label htmlFor="new-quest-color" className="block text-sm font-medium text-[#5a3210] mb-2">
-                Color
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  id="new-quest-color"
-                  type="color"
-                  value={newQuestColor}
-                  onChange={(e) => setNewQuestColor(e.target.value)}
-                  className="h-10 w-14 cursor-pointer rounded border border-[#8b5a2b] bg-transparent p-0.5"
-                />
-                <input
-                  type="text"
-                  value={newQuestColor}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setNewQuestColor(v || DEFAULT_COLOR);
-                  }}
-                  className="flex-1 max-w-[8rem] font-mono text-sm scroll-input"
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
+            <ColorPickerRow
+              id="new-quest-color"
+              value={newQuestColor}
+              onChange={setNewQuestColor}
+            />
 
             <div className="flex gap-2">
               <button type="submit" className="flex-1 rounded px-4 py-2 font-medium bg-[#b8860b] text-white hover:brightness-110 transition-all">
@@ -476,38 +425,23 @@ export function ActivityManager({
         </ScrollModal>
       )}
 
-      {confirmRemoveQuestId && (
-        <ScrollModal
-          isOpen
-          onClose={() => setConfirmRemoveQuestId(null)}
-          title="Remove quest?"
-        >
-          <p className="text-[#6b5344] text-sm mb-4">
-            Are you sure you want to remove <strong className="text-[#2c1505]">{questToRemove?.name ?? 'this quest'}</strong>? This cannot be undone.
-          </p>
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setConfirmRemoveQuestId(null)}
-              className="px-4 py-2 rounded border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] transition-colors font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onRemoveActivity(confirmRemoveQuestId);
-                setConfirmRemoveQuestId(null);
-                setSelectedQuestId(null);
-                setEditModalOpen(false);
-              }}
-              className="px-4 py-2 rounded text-white bg-destructive hover:bg-destructive-hover transition-colors font-medium"
-              >
-                Remove
-              </button>
-            </div>
-        </ScrollModal>
-      )}
+      <ConfirmModal
+        isOpen={!!confirmRemoveQuestId}
+        onClose={() => setConfirmRemoveQuestId(null)}
+        title="Remove quest?"
+        confirmLabel="Remove"
+        danger
+        onConfirm={() => {
+          if (confirmRemoveQuestId) {
+            onRemoveActivity(confirmRemoveQuestId);
+            setConfirmRemoveQuestId(null);
+            setSelectedQuestId(null);
+            setEditModalOpen(false);
+          }
+        }}
+      >
+        Are you sure you want to remove <strong className="text-[#2c1505]">{questToRemove?.name ?? 'this quest'}</strong>? This cannot be undone.
+      </ConfirmModal>
     </div>
   );
 }
@@ -589,42 +523,7 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
           </div>
         ) : (
           <>
-            <div>
-              <label className="block text-sm font-medium text-[#5a3210] mb-2">
-                Objective
-              </label>
-              <p className="text-[#6b5344] text-xs mb-2">
-                {OBJECTIVE_HINT}
-              </p>
-              <div className="flex flex-wrap items-center gap-2 p-2 rounded border border-[#8b5a2b]/50 bg-[#faf0dc]/80">
-                <input
-                  type="number"
-                  min={1}
-                  value={goal.amount}
-                  onChange={(e) => handleUpdateGoal('amount', Number(e.target.value) || 1)}
-                  className="w-16 text-center py-1.5 scroll-input"
-                />
-                <select
-                  value={goal.unit}
-                  onChange={(e) => handleUpdateGoal('unit', e.target.value as QuestGoal['unit'])}
-                  className="flex-1 min-w-[100px] py-1.5 scroll-input"
-                >
-                  {QUEST_GOAL_UNITS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <span className="text-[#6b5344] text-sm">per</span>
-                <select
-                  value={goal.timeRange}
-                  onChange={(e) => handleUpdateGoal('timeRange', e.target.value as QuestGoal['timeRange'])}
-                  className="flex-1 min-w-[100px] py-1.5 scroll-input"
-                >
-                  {QUEST_GOAL_TIME_RANGES.map((tr) => (
-                    <option key={tr} value={tr}>{tr}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <GoalEditor goal={goal} onChange={handleUpdateGoal} idPrefix="edit" />
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm font-medium text-[#5a3210] mb-1">Start date</label>
@@ -649,30 +548,7 @@ function EditQuestForm({ quest, isSideQuest, onSave, onRemove }: EditQuestFormPr
             </div>
           </>
         )}
-        <div>
-          <label htmlFor="edit-quest-color" className="block text-sm font-medium text-[#5a3210] mb-2">
-            Color
-          </label>
-          <div className="flex items-center gap-3">
-            <input
-              id="edit-quest-color"
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-10 w-14 cursor-pointer rounded border border-[#8b5a2b] bg-transparent p-0.5"
-            />
-            <input
-              type="text"
-              value={color}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                if (/^#[0-9A-Fa-f]{6}$/.test(v) || v === '') setColor(v || '#3b82f6');
-              }}
-              className="flex-1 max-w-[8rem] font-mono text-sm scroll-input"
-              placeholder="#3b82f6"
-            />
-          </div>
-        </div>
+        <ColorPickerRow id="edit-quest-color" value={color} onChange={setColor} />
         <div className="flex gap-2">
           <button type="submit" className="flex-1 rounded px-4 py-2 font-medium text-sm bg-[#b8860b] text-white hover:brightness-110 transition-all">
             Save changes

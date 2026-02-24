@@ -3,6 +3,7 @@ import { Clock } from 'lucide-react';
 import type { Activity, ActivityLog, QuestGoal } from '../types';
 import { formatDateWithTodayYesterday, formatDateTimeLogged, formatHourLabel, formatTimeOnly, getDateStringFromISO, getPeriodBoundsForDate, isLogDateInPeriod, parseLocalDate, type PeriodTimeRange } from '../utils/date';
 import { ACTIVITY_ARCHETYPE_LABELS, ArchetypeIcon } from './archetype-icon';
+import { ConfirmModal } from './ConfirmModal';
 import { ScrollModal } from './ScrollModal';
 
 interface RecentLogsProps {
@@ -234,43 +235,26 @@ export function RecentLogs({ activities, logs, kindTab, onDeleteLog }: RecentLog
         </ScrollModal>
       )}
 
-      {confirmDeleteLogId && (
-        <ScrollModal
-          isOpen
-          onClose={() => setConfirmDeleteLogId(null)}
-          title="Delete log?"
-        >
-          <p className="text-[#2c1505] mb-4">
-            {deleteActivity ? (
-              <>Are you sure you want to delete this log for <strong>{deleteActivity.name}</strong>?</>
-            ) : (
-              'Are you sure you want to delete this log?'
-            )}{' '}
-            Deleting this log will remove any progress it had made towards the campaign objective.
-            <br />
-            This cannot be undone.
-          </p>
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setConfirmDeleteLogId(null)}
-              className="px-4 py-2 rounded border border-[#8b5a2b] text-[#3d1f05] bg-[#faf0dc] hover:bg-[#f5e6c0] font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onDeleteLog(confirmDeleteLogId);
-                setConfirmDeleteLogId(null);
-              }}
-              className="px-4 py-2 rounded text-white bg-red-700 hover:bg-red-800 font-medium transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        </ScrollModal>
-      )}
+      <ConfirmModal
+        isOpen={!!confirmDeleteLogId}
+        onClose={() => setConfirmDeleteLogId(null)}
+        title="Delete log?"
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (confirmDeleteLogId) {
+            onDeleteLog(confirmDeleteLogId);
+            setConfirmDeleteLogId(null);
+          }
+        }}
+      >
+        {deleteActivity ? (
+          <>Are you sure you want to delete this log for <strong>{deleteActivity.name}</strong>?</>
+        ) : (
+          'Are you sure you want to delete this log?'
+        )}{' '}
+        Deleting this log will remove any progress it had made towards the campaign objective. This cannot be undone.
+      </ConfirmModal>
     </div>
   );
 }

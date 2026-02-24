@@ -377,8 +377,8 @@ export function ActivityStats({ activities, logs, kindTab, onLogActivity }: Acti
                 <input
                   id="log-hours"
                   type="number"
-                  step="1"
-                  min="1"
+                  step="0.25"
+                  min="0"
                   value={logHours}
                   onChange={(e) => setLogHours(e.target.value)}
                   className="input-base w-full scroll-input"
